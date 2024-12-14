@@ -51,13 +51,16 @@ class FirestoreService {
 
   // Update gift status (Pledged/Available)
   Future<void> updateGiftStatus(
-      String eventId, String giftId, String newStatus) async {
-    await _db
+      String eventId, String giftId, String status, String? pledgerId) async {
+    await FirebaseFirestore.instance
         .collection('events')
         .doc(eventId)
         .collection('gifts')
         .doc(giftId)
-        .update({'status': newStatus});
+        .update({
+      'status': status,
+      'pledgerId': pledgerId,
+    });
   }
 
   Future<Map<String, dynamic>?> getEventByName(String eventName) async {
