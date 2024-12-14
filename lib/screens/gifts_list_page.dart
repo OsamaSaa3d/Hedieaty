@@ -118,20 +118,31 @@ class _GiftListPageState extends State<GiftListPage> {
             itemCount: filteredGifts.length,
             itemBuilder: (context, index) {
               final gift = filteredGifts[index];
+              final isPledged = gift['status'] == 'Pledged';
+              final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+              final pledgerId =
+                  gift['pledgerId']; // ID of the user who pledged this gift
+
               return GiftTile(
                 giftName: gift["name"]!,
                 category: gift["category"]!,
                 status: gift["status"]!,
-                onEdit:
-                    isUserCreator ? () => _editGift(gifts.indexOf(gift)) : null,
-                onDelete: isUserCreator
+
+                // Allow editing or deleting only if the user is the creator and the gift is not pledged
+                onEdit: (isUserCreator && !isPledged)
+                    ? () => _editGift(gifts.indexOf(gift))
+                    : null,
+                onDelete: (isUserCreator && !isPledged)
                     ? () => _deleteGift(gifts.indexOf(gift))
                     : null,
-                onPledgeChange: isUserCreator
-                    ? null
-                    : (bool isPledged) {
-                        _togglePledgeGift(index, isPledged);
-                      },
+
+                // Pledging logic: Only allow pledging if the gift is "Available" or unpledging if the current user is the pledger
+                onPledgeChange:
+                    (isUserCreator || (isPledged && pledgerId != currentUserId))
+                        ? null // Disable the toggle for non-pledgers
+                        : (bool newValue) {
+                            _togglePledgeGift(index, newValue);
+                          },
               );
             },
           );
@@ -244,13 +255,40 @@ class _GiftListPageState extends State<GiftListPage> {
 
   // Function to toggle pledge status
   void _togglePledgeGift(int index, bool isPledged) async {
-    final newStatus = isPledged ? 'Pledged' : 'Available';
-    await _firestoreService.updateGiftStatus(
-        widget.event.id, gifts[index]['id'], newStatus);
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
-    setState(() {
-      gifts[index]['status'] = newStatus; // Update the UI
-    });
+    final gift = gifts[index];
+    final isAlreadyPledged = gift['status'] == 'Pledged';
+    final pledgerId = gift['pledgerId'];
+
+    // Check if another user is trying to unpledge or pledge a gift already pledged
+    if (isAlreadyPledged && pledgerId != currentUserId) {
+      print(
+          "You cannot change the pledge status of a gift pledged by someone else.");
+      return; // Exit early
+    }
+
+    // Determine new status and pledger ID
+    final newStatus = isPledged ? 'Pledged' : 'Available';
+    final newPledgerId = isPledged ? currentUserId : null;
+
+    try {
+      // Update Firestore
+      await _firestoreService.updateGiftStatus(
+        widget.event.id,
+        gift['id'],
+        newStatus,
+        newPledgerId,
+      );
+
+      // Update local state
+      setState(() {
+        gifts[index]['status'] = newStatus;
+        gifts[index]['pledgerId'] = newPledgerId; // Update pledger ID
+      });
+    } catch (e) {
+      print("Error updating pledge status: $e");
+    }
   }
 }
 
@@ -299,11 +337,28 @@ class GiftTile extends StatelessWidget {
               ),
             if (onPledgeChange != null)
               Switch(
-                value: status ==
-                    "Pledged", // If status is "Pledged", the switch will be on
+                value:
+                    status == "Pledged", // Switch is ON if status is "Pledged"
                 onChanged: (bool value) {
-                  onPledgeChange!(
-                      value); // Trigger the callback to change the pledge status
+                  final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
+                  // Prevent changing the pledge status if:
+                  // 1. The gift is already pledged by another user
+                  // 2. The current user isn't the pledger
+                  if (status == "Pledged" && currentUserId != null) {
+                    // Call onPledgeChange only if the user is the pledger
+                    if (onPledgeChange != null) {
+                      onPledgeChange!(value);
+                    } else {
+                      print("You don't have permission to unpledge this gift.");
+                    }
+                  }
+                  // Allow pledging if the gift is "Available"
+                  else if (status == "Available" && currentUserId != null) {
+                    if (onPledgeChange != null) {
+                      onPledgeChange!(value);
+                    }
+                  }
                 },
                 activeColor: Colors.blue,
                 inactiveThumbColor: Colors.grey,
