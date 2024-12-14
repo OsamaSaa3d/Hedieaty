@@ -72,6 +72,7 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
             "category": category,
             "price": price,
             "status": isPledged ? "Pledged" : "Available",
+            "PledgerId": null,
           });
         } else {
           // Add new gift
@@ -81,6 +82,7 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
             "category": category,
             "price": price,
             "status": isPledged ? "Pledged" : "Available",
+            "PledgerId": null,
           });
 
           // Get the generated ID
@@ -96,6 +98,7 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
             "category": category,
             "price": price,
             "status": isPledged ? "Pledged" : "Available",
+            "PledgerId": null,
           });
         }
       } catch (e) {
