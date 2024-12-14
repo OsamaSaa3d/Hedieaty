@@ -1,6 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart'; // For formatting dates
 
 class MyPledgedGiftsPage extends StatefulWidget {
   @override
@@ -8,79 +9,161 @@ class MyPledgedGiftsPage extends StatefulWidget {
 }
 
 class _MyPledgedGiftsPageState extends State<MyPledgedGiftsPage> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  List<Map<String, dynamic>> pledgedGifts = [];
-  bool _isLoading = true;
+  User? _user;
+  List<Map<String, dynamic>> _pledgedGifts = []; // Store pledged gifts data
 
   @override
   void initState() {
     super.initState();
-    _fetchPledgedGifts();
-  }
-
-  Future<void> _fetchPledgedGifts() async {
-    User? user = _auth.currentUser;
-    if (user != null) {
-      try {
-        QuerySnapshot snapshot = await _firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('pledged_gifts')
-            .get();
-
-        setState(() {
-          pledgedGifts = snapshot.docs
-              .map((doc) => {
-                    'name': doc['name'],
-                    'friend': doc['friend'],
-                    'dueDate': doc['dueDate'],
-                    'id': doc.id
-                  })
-              .toList();
-          _isLoading = false;
-        });
-      } catch (e) {
-        print("Error fetching pledged gifts: $e");
-        setState(() {
-          _isLoading = false;
-        });
-      }
+    _user = _auth.currentUser;
+    if (_user != null) {
+      _fetchPledgedGifts();
     }
   }
 
-  Future<void> _editPledgedGift(String giftId) async {
-    // Implement functionality to edit the pledged gift (e.g., navigate to an edit page)
-    // For simplicity, let's just show a Snackbar here for now
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Editing pledged gift with ID: $giftId')),
-    );
+  // Fetch all pledged gifts for the current user
+  Future<void> _fetchPledgedGifts() async {
+    List<Map<String, dynamic>> pledgedGifts = [];
+
+    // Fetch all events where the current user is the pledger
+    QuerySnapshot eventSnapshot = await _firestore.collection('events').get();
+    for (var eventDoc in eventSnapshot.docs) {
+      // Get the gifts collection for each event
+      QuerySnapshot giftSnapshot =
+          await eventDoc.reference.collection('gifts').get();
+
+      for (var giftDoc in giftSnapshot.docs) {
+        var giftData = giftDoc.data() as Map<String, dynamic>;
+
+        // Check if the current user is the pledger
+        if (giftData['pledgerId'] == _user!.uid) {
+          // If the user has pledged this gift, fetch additional data
+          // print(giftData['name']);
+          var userSnapshot = await _firestore
+              .collection('users')
+              .doc(eventDoc['userId'])
+              .get();
+          var userName = userSnapshot['name'] ?? 'Unknown';
+
+          // Get the event date (just the day part)
+          var eventDate = (eventDoc['date'] as Timestamp).toDate();
+          var eventDay = DateFormat('dd MMM yyyy').format(eventDate);
+
+          // Check if the event date is in the future
+          bool canUnpledge = eventDate.isAfter(DateTime.now());
+
+          pledgedGifts.add({
+            'giftName': giftData['name'],
+            'eventName': eventDoc['name'],
+            'eventDate': eventDay,
+            'eventId': eventDoc.id,
+            'eventCreator': userName,
+            'giftId': giftData['id'],
+            'eventDateTime': eventDate, // Store full event date for comparison
+            'canUnpledge': canUnpledge, // Can the user unpledge this gift?
+          });
+        }
+      }
+    }
+
+    setState(() {
+      _pledgedGifts = pledgedGifts;
+    });
+  }
+
+  void _unpledgeGift(String giftId, String eventId) async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
+    // Fetch the gift document from Firestore using the giftId and eventId
+    final giftDoc = await _firestore
+        .collection('events')
+        .doc(eventId)
+        .collection('gifts')
+        .doc(giftId)
+        .get();
+
+    if (!giftDoc.exists) {
+      print("Gift not found.");
+      return;
+    }
+
+    final giftData = giftDoc.data() as Map<String, dynamic>;
+    final pledgerId = giftData['pledgerId'];
+
+    // Check if the current user is the pledger of the gift
+    if (pledgerId != currentUserId) {
+      print("You cannot unpledge this gift as you are not the pledger.");
+      return;
+    }
+
+    // Update Firestore to unpledge the gift
+    try {
+      await _firestore
+          .collection('events')
+          .doc(eventId)
+          .collection('gifts')
+          .doc(giftId)
+          .update({
+        'pledgerId': null,
+        'status': 'Available', // Change the status back to 'Available'
+      });
+
+      // Update local state
+      setState(() {
+        _pledgedGifts = _pledgedGifts.map((gift) {
+          if (gift['giftId'] == giftId) {
+            gift['pledgerId'] = null;
+            gift['status'] = 'Available'; // Update the status locally
+          }
+          return gift;
+        }).toList();
+      });
+
+      print("Gift unpledged successfully.");
+    } catch (e) {
+      print("Error unpledging gift: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text("My Pledged Gifts")),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : pledgedGifts.isEmpty
-              ? Center(child: Text('No pledged gifts yet.'))
-              : ListView.builder(
-                  itemCount: pledgedGifts.length,
-                  itemBuilder: (context, index) {
-                    var gift = pledgedGifts[index];
-                    return ListTile(
-                      title: Text(gift['name']),
-                      subtitle: Text(
-                          'Friend: ${gift['friend']}, Due: ${gift['dueDate']}'),
-                      trailing: IconButton(
-                        icon: Icon(Icons.edit),
-                        onPressed: () => _editPledgedGift(gift['id']),
-                      ),
-                    );
-                  },
-                ),
+      body: _pledgedGifts.isEmpty
+          ? Center(child: Text("You haven't pledged any gifts yet."))
+          : ListView.builder(
+              itemCount: _pledgedGifts.length,
+              itemBuilder: (context, index) {
+                final gift = _pledgedGifts[index];
+                return Card(
+                  margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  child: ListTile(
+                    title: Text(gift['giftName'],
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Event: ${gift['eventName']}"),
+                        Text("Pledged for: ${gift['eventCreator']}"),
+                        Text("Date: ${gift['eventDate']}"),
+                      ],
+                    ),
+                    // Adding the "Unpledge" button if the event date is in the future
+                    trailing: gift['canUnpledge']
+                        ? ElevatedButton(
+                            onPressed: () {
+                              _unpledgeGift(gift['giftId'], gift['eventId']);
+                            },
+                            child: Text("Unpledge"),
+                          )
+                        : null,
+                  ),
+                );
+              },
+            ),
     );
   }
 }
