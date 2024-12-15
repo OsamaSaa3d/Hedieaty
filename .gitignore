@@ -1,0 +1,52 @@
+# Flutter/Dart/Pub related
+.dart_tool/
+.pub-cache/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+.idea/
+.DS_Store
+
+# Build outputs
+build/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Android related
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/.gradle/
+android/app/build/
+android/local.properties
+
+# Flutter dependencies
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IntelliJ related
+*.iml
+.idea/
+
+# VS Code related
+.vscode/
+
+# Byte-compiled / optimized / DLL files
+*.class
+*.jar
+*.war
+*.ear
+*.dll
+*.exe
+*.cache
+*.ico
+*.pdf
+*.dmg
+*.pkg
+*.log
+
+# Packages
+.pub/
