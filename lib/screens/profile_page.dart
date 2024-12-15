@@ -6,7 +6,8 @@ import 'package:lab3/screens/gifts_list_page.dart'; // Import the GiftsListPage
 import 'package:lab3/screens/events_list_page.dart'; // Import the EventListPage
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:convert'; // For base64 encoding
+import 'dart:typed_data';
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -103,64 +104,42 @@ class _ProfilePageState extends State<ProfilePage> {
         _profileImage = File(pickedFile.path); // Store the selected file
       });
 
-      // Call the upload function after selecting the image
+      // Convert the image to base64 and store it in Firestore
       _uploadProfilePicture();
     } else {
       print("No image selected");
     }
   }
 
-  // Method to upload the selected image to Firebase Storage
   Future<void> _uploadProfilePicture() async {
     if (_profileImage == null) return;
 
     try {
-      final User? user = _auth.currentUser;
+      // Convert the image file to a base64 string
+      List<int> imageBytes = await _profileImage!.readAsBytes();
+      String base64Image = base64Encode(imageBytes);
+
+      // Get the current user
+      final User? user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      // Define the file name and reference in Firebase Storage
-      String fileName =
-          'profile_pics/${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      print("Uploading profile picture to $fileName");
-      Reference storageRef = FirebaseStorage.instance.ref().child(fileName);
-      print("Storage reference: $storageRef");
-
-      // Create an upload task
-      UploadTask uploadTask = storageRef.putFile(_profileImage!);
-      print("Upload task: $uploadTask");
-
-      // Monitor the upload progress or completion
-      await uploadTask.whenComplete(() async {
-        try {
-          // Once upload completes, get the download URL
-          String downloadURL = await storageRef.getDownloadURL();
-          print("Download URL: $downloadURL");
-
-          // Save the image URL in Firestore
-          print("Updating profile picture URL in Firestore");
-          await _firestore.collection('users').doc(user.uid).update({
-            'profilePicUrl': downloadURL,
-          });
-          print("Profile picture URL updated successfully");
-
-          // Update the state with the new image URL
-          setState(() {
-            _profileImageUrl = downloadURL;
-          });
-
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Profile picture uploaded successfully!')),
-          );
-        } catch (e) {
-          // Handle any errors during the URL retrieval or Firestore update
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error during post-upload processing: $e')),
-          );
-        }
+      // Save the base64 image string in Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({
+        'profilePicUrl': base64Image,
       });
+
+      // Update the state with the new base64 string (optional)
+      setState(() {
+        _profileImageUrl = base64Image;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Profile picture uploaded successfully!')),
+      );
     } catch (e) {
-      // Handle any errors during the initial upload
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error uploading profile picture: $e')),
       );
@@ -218,6 +197,20 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Image _getProfileImage() {
+    if (_profileImageUrl.isNotEmpty) {
+      // If the profile image URL is a base64 string
+      try {
+        Uint8List bytes = base64Decode(_profileImageUrl);
+        return Image.memory(bytes); // Display the image from the decoded bytes
+      } catch (e) {
+        print("Error decoding base64 image: $e");
+      }
+    }
+    return Image.asset(
+        'assets/default_profile_image.png'); // Default image if not set
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -251,10 +244,9 @@ class _ProfilePageState extends State<ProfilePage> {
                           child: CircleAvatar(
                             radius: 50,
                             backgroundImage: _profileImageUrl.isNotEmpty
-                                ? NetworkImage(_profileImageUrl)
-                                : _profileImage != null
-                                    ? FileImage(_profileImage!) as ImageProvider
-                                    : null,
+                                ? _getProfileImage()
+                                    .image // Use the base64-decoded image
+                                : null,
                             child: _profileImageUrl.isEmpty &&
                                     _profileImage == null
                                 ? Icon(Icons.camera_alt,
