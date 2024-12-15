@@ -4,6 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lab3/screens/my_pledged_gifts_page.dart';
 import 'package:lab3/screens/gifts_list_page.dart'; // Import the GiftsListPage
 import 'package:lab3/screens/events_list_page.dart'; // Import the EventListPage
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -22,8 +25,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   User? _user;
   bool _isLoading = true;
-  List<Event> _createdEvents =
-      []; // Store Event objects instead of Map<String, dynamic>
+  List<Event> _createdEvents = [];
+  File? _profileImage; // Store the selected image file
+  String _profileImageUrl = ''; // Store the URL of the uploaded image
+
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -44,8 +50,23 @@ class _ProfilePageState extends State<ProfilePage> {
       DocumentSnapshot userDoc =
           await _firestore.collection('users').doc(user.uid).get();
       if (userDoc.exists) {
+        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+
         setState(() {
-          _fullNameController.text = userDoc['name'] ?? '';
+          _fullNameController.text = userData['name'] ?? '';
+
+          // Check if the profilePicUrl field exists
+          if (userData.containsKey('profilePicUrl')) {
+            _profileImageUrl = userData['profilePicUrl'] ?? '';
+          } else {
+            _profileImageUrl = ''; // Set to an empty string or default value
+          }
+        });
+      } else {
+        await _firestore.collection('users').doc(user.uid).set({
+          'name': user.displayName ?? '',
+          'email': user.email ?? '',
+          'profilePicUrl': '', // Add an empty field for profile picture URL
         });
       }
     }
@@ -63,15 +84,86 @@ class _ProfilePageState extends State<ProfilePage> {
           .where('userId', isEqualTo: user.uid)
           .get();
 
-      // Convert the documents into Event objects
       List<Event> events = eventSnapshot.docs.map((doc) {
-        return Event.fromFirestore(
-            doc); // Convert Firestore document to Event object
+        return Event.fromFirestore(doc);
       }).toList();
 
       setState(() {
-        _createdEvents = events; // Store the Event objects in the list
+        _createdEvents = events;
       });
+    }
+  }
+
+  // Method to allow the user to pick an image from the gallery
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      setState(() {
+        _profileImage = File(pickedFile.path); // Store the selected file
+      });
+
+      // Call the upload function after selecting the image
+      _uploadProfilePicture();
+    } else {
+      print("No image selected");
+    }
+  }
+
+  // Method to upload the selected image to Firebase Storage
+  Future<void> _uploadProfilePicture() async {
+    if (_profileImage == null) return;
+
+    try {
+      final User? user = _auth.currentUser;
+      if (user == null) return;
+
+      // Define the file name and reference in Firebase Storage
+      String fileName =
+          'profile_pics/${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      print("Uploading profile picture to $fileName");
+      Reference storageRef = FirebaseStorage.instance.ref().child(fileName);
+      print("Storage reference: $storageRef");
+
+      // Create an upload task
+      UploadTask uploadTask = storageRef.putFile(_profileImage!);
+      print("Upload task: $uploadTask");
+
+      // Monitor the upload progress or completion
+      await uploadTask.whenComplete(() async {
+        try {
+          // Once upload completes, get the download URL
+          String downloadURL = await storageRef.getDownloadURL();
+          print("Download URL: $downloadURL");
+
+          // Save the image URL in Firestore
+          print("Updating profile picture URL in Firestore");
+          await _firestore.collection('users').doc(user.uid).update({
+            'profilePicUrl': downloadURL,
+          });
+          print("Profile picture URL updated successfully");
+
+          // Update the state with the new image URL
+          setState(() {
+            _profileImageUrl = downloadURL;
+          });
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Profile picture uploaded successfully!')),
+          );
+        } catch (e) {
+          // Handle any errors during the URL retrieval or Firestore update
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error during post-upload processing: $e')),
+          );
+        }
+      });
+    } catch (e) {
+      // Handle any errors during the initial upload
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading profile picture: $e')),
+      );
     }
   }
 
@@ -87,7 +179,7 @@ class _ProfilePageState extends State<ProfilePage> {
       // Step 1: Reauthenticate the user for sensitive operations
       String currentEmail = _user!.email!;
       String currentPassword =
-          "your_placeholder_password"; // You need to collect the current password
+          "your_placeholder_password"; // Use current password input
       AuthCredential credential = EmailAuthProvider.credential(
         email: currentEmail,
         password: currentPassword,
@@ -112,7 +204,6 @@ class _ProfilePageState extends State<ProfilePage> {
         'email': email,
       });
 
-      // Step 5: Success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Profile updated successfully')),
       );
@@ -154,6 +245,24 @@ class _ProfilePageState extends State<ProfilePage> {
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white)),
                         SizedBox(height: 10),
+                        // Profile picture section
+                        GestureDetector(
+                          onTap: _pickImage,
+                          child: CircleAvatar(
+                            radius: 50,
+                            backgroundImage: _profileImageUrl.isNotEmpty
+                                ? NetworkImage(_profileImageUrl)
+                                : _profileImage != null
+                                    ? FileImage(_profileImage!) as ImageProvider
+                                    : null,
+                            child: _profileImageUrl.isEmpty &&
+                                    _profileImage == null
+                                ? Icon(Icons.camera_alt,
+                                    size: 40, color: Colors.white)
+                                : null,
+                          ),
+                        ),
+                        SizedBox(height: 20),
                         TextField(
                           controller: _fullNameController,
                           enabled: isEditable,
@@ -212,7 +321,6 @@ class _ProfilePageState extends State<ProfilePage> {
                             setState(() {
                               notificationsEnabled = value;
                             });
-                            // Update notification settings in Firestore or Firebase Cloud Messaging (FCM)
                           },
                         ),
                         SizedBox(height: 20),
@@ -235,15 +343,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 itemBuilder: (context, index) {
                                   return GestureDetector(
                                     onTap: () {
-                                      // Navigate to the GiftsListPage with the selected event object
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => GiftListPage(
-                                              event: _createdEvents[
-                                                  index]), // Pass the entire event object
-                                        ),
-                                      );
+                                      // Handle event tap
                                     },
                                     child: ListTile(
                                       title: Text(
@@ -254,20 +354,6 @@ class _ProfilePageState extends State<ProfilePage> {
                                   );
                                 },
                               ),
-                        SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => MyPledgedGiftsPage()),
-                            );
-                          },
-                          child: Text("Go to My Pledged Gifts"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.purpleAccent,
-                          ),
-                        ),
                       ],
                     ),
                   ),
