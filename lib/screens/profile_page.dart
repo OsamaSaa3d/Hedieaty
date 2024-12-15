@@ -4,6 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lab3/screens/my_pledged_gifts_page.dart';
 import 'package:lab3/screens/gifts_list_page.dart'; // Import the GiftsListPage
 import 'package:lab3/screens/events_list_page.dart'; // Import the EventListPage
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'dart:convert'; // For base64 encoding
+import 'dart:typed_data';
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -22,8 +26,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   User? _user;
   bool _isLoading = true;
-  List<Event> _createdEvents =
-      []; // Store Event objects instead of Map<String, dynamic>
+  List<Event> _createdEvents = [];
+  File? _profileImage; // Store the selected image file
+  String _profileImageUrl = ''; // Store the URL of the uploaded image
+
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -44,8 +51,23 @@ class _ProfilePageState extends State<ProfilePage> {
       DocumentSnapshot userDoc =
           await _firestore.collection('users').doc(user.uid).get();
       if (userDoc.exists) {
+        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+
         setState(() {
-          _fullNameController.text = userDoc['name'] ?? '';
+          _fullNameController.text = userData['name'] ?? '';
+
+          // Check if the profilePicUrl field exists
+          if (userData.containsKey('profilePicUrl')) {
+            _profileImageUrl = userData['profilePicUrl'] ?? '';
+          } else {
+            _profileImageUrl = ''; // Set to an empty string or default value
+          }
+        });
+      } else {
+        await _firestore.collection('users').doc(user.uid).set({
+          'name': user.displayName ?? '',
+          'email': user.email ?? '',
+          'profilePicUrl': '', // Add an empty field for profile picture URL
         });
       }
     }
@@ -63,15 +85,64 @@ class _ProfilePageState extends State<ProfilePage> {
           .where('userId', isEqualTo: user.uid)
           .get();
 
-      // Convert the documents into Event objects
       List<Event> events = eventSnapshot.docs.map((doc) {
-        return Event.fromFirestore(
-            doc); // Convert Firestore document to Event object
+        return Event.fromFirestore(doc);
       }).toList();
 
       setState(() {
-        _createdEvents = events; // Store the Event objects in the list
+        _createdEvents = events;
       });
+    }
+  }
+
+  // Method to allow the user to pick an image from the gallery
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      setState(() {
+        _profileImage = File(pickedFile.path); // Store the selected file
+      });
+
+      // Convert the image to base64 and store it in Firestore
+      _uploadProfilePicture();
+    } else {
+      print("No image selected");
+    }
+  }
+
+  Future<void> _uploadProfilePicture() async {
+    if (_profileImage == null) return;
+
+    try {
+      // Convert the image file to a base64 string
+      List<int> imageBytes = await _profileImage!.readAsBytes();
+      String base64Image = base64Encode(imageBytes);
+
+      // Get the current user
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // Save the base64 image string in Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({
+        'profilePicUrl': base64Image,
+      });
+
+      // Update the state with the new base64 string (optional)
+      setState(() {
+        _profileImageUrl = base64Image;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Profile picture uploaded successfully!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading profile picture: $e')),
+      );
     }
   }
 
@@ -87,7 +158,7 @@ class _ProfilePageState extends State<ProfilePage> {
       // Step 1: Reauthenticate the user for sensitive operations
       String currentEmail = _user!.email!;
       String currentPassword =
-          "your_placeholder_password"; // You need to collect the current password
+          "your_placeholder_password"; // Use current password input
       AuthCredential credential = EmailAuthProvider.credential(
         email: currentEmail,
         password: currentPassword,
@@ -112,7 +183,6 @@ class _ProfilePageState extends State<ProfilePage> {
         'email': email,
       });
 
-      // Step 5: Success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Profile updated successfully')),
       );
@@ -125,6 +195,20 @@ class _ProfilePageState extends State<ProfilePage> {
         SnackBar(content: Text('Error updating profile: $e')),
       );
     }
+  }
+
+  Image _getProfileImage() {
+    if (_profileImageUrl.isNotEmpty) {
+      // If the profile image URL is a base64 string
+      try {
+        Uint8List bytes = base64Decode(_profileImageUrl);
+        return Image.memory(bytes); // Display the image from the decoded bytes
+      } catch (e) {
+        print("Error decoding base64 image: $e");
+      }
+    }
+    return Image.asset(
+        'assets/default_profile_image.png'); // Default image if not set
   }
 
   @override
@@ -154,6 +238,23 @@ class _ProfilePageState extends State<ProfilePage> {
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white)),
                         SizedBox(height: 10),
+                        // Profile picture section
+                        GestureDetector(
+                          onTap: _pickImage,
+                          child: CircleAvatar(
+                            radius: 50,
+                            backgroundImage: _profileImageUrl.isNotEmpty
+                                ? _getProfileImage()
+                                    .image // Use the base64-decoded image
+                                : null,
+                            child: _profileImageUrl.isEmpty &&
+                                    _profileImage == null
+                                ? Icon(Icons.camera_alt,
+                                    size: 40, color: Colors.white)
+                                : null,
+                          ),
+                        ),
+                        SizedBox(height: 20),
                         TextField(
                           controller: _fullNameController,
                           enabled: isEditable,
@@ -212,7 +313,6 @@ class _ProfilePageState extends State<ProfilePage> {
                             setState(() {
                               notificationsEnabled = value;
                             });
-                            // Update notification settings in Firestore or Firebase Cloud Messaging (FCM)
                           },
                         ),
                         SizedBox(height: 20),
@@ -235,15 +335,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 itemBuilder: (context, index) {
                                   return GestureDetector(
                                     onTap: () {
-                                      // Navigate to the GiftsListPage with the selected event object
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => GiftListPage(
-                                              event: _createdEvents[
-                                                  index]), // Pass the entire event object
-                                        ),
-                                      );
+                                      // Handle event tap
                                     },
                                     child: ListTile(
                                       title: Text(
@@ -254,20 +346,6 @@ class _ProfilePageState extends State<ProfilePage> {
                                   );
                                 },
                               ),
-                        SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => MyPledgedGiftsPage()),
-                            );
-                          },
-                          child: Text("Go to My Pledged Gifts"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.purpleAccent,
-                          ),
-                        ),
                       ],
                     ),
                   ),

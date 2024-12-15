@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert'; // Import for base64 decoding
 import 'create_event_list_page.dart';
 import 'events_list_page.dart';
 import 'friend_tile.dart';
@@ -31,6 +34,19 @@ class _HomePageState extends State<HomePage> {
     if (currentUserId != null) {
       _fetchFriends();
     }
+    // Listen for changes in the search text and filter friends accordingly
+    searchController.addListener(() {
+      _filterFriends();
+    });
+  }
+
+  void _filterFriends() {
+    final query = searchController.text.toLowerCase();
+    setState(() {
+      filteredFriends = friends
+          .where((friend) => friend.name.toLowerCase().contains(query))
+          .toList();
+    });
   }
 
   Future<int> _fetchUpcomingEvents(String friendId) async {
@@ -53,6 +69,7 @@ class _HomePageState extends State<HomePage> {
     if (currentUserId == null) return;
 
     try {
+      // Fetch friends where currentUserId is userId1 or userId2
       final querySnapshot = await _firestore
           .collection('friends')
           .where('userId1', isEqualTo: currentUserId)
@@ -63,19 +80,38 @@ class _HomePageState extends State<HomePage> {
           .get();
 
       final List<Friend> loadedFriends = [];
+
       for (final doc in [...querySnapshot.docs, ...querySnapshot2.docs]) {
         final data = doc.data() as Map<String, dynamic>;
         final friendId = data['userId1'] == currentUserId
             ? data['userId2']
             : data['userId1'];
 
+        // Fetch profile data from the 'users' collection
+        final userDoc =
+            await _firestore.collection('users').doc(friendId).get();
+        final userData = userDoc.data() as Map<String, dynamic>?;
+
+        // Get upcoming events count
         final upcomingEventsCount = await _fetchUpcomingEvents(friendId);
+
+        // Add friend to the list
         loadedFriends.add(Friend.fromMap(
-          {...data, 'upcomingEvents': upcomingEventsCount},
+          {
+            ...data,
+            'profilePicUrl':
+                userData?['profilePicUrl'] ?? '', // Safely fetch profilePicUrl
+            'upcomingEvents': upcomingEventsCount,
+          },
           friendId,
           currentUserId,
         ));
       }
+
+      for (final friend in loadedFriends) {
+        print('Friend: ${friend.name}, ProfilePicUrl: ${friend.profilePicUrl}');
+      }
+
       setState(() {
         friends = loadedFriends;
         filteredFriends = loadedFriends;
@@ -151,6 +187,18 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
             ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: TextField(
+                controller: searchController,
+                decoration: InputDecoration(
+                  labelText: "Search Friends",
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.search),
+                ),
+              ),
+            ),
+
             Expanded(
               child: isLoading
                   ? Center(
@@ -182,10 +230,27 @@ class _HomePageState extends State<HomePage> {
                                   vertical: 5, horizontal: 16),
                               color: Colors.white,
                               child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundImage:
+                                      friend.profilePicUrl != null &&
+                                              friend.profilePicUrl!.isNotEmpty
+                                          ? Image.memory(base64Decode(
+                                                  friend.profilePicUrl!))
+                                              .image
+                                          : const AssetImage(
+                                              "assets/default_profile_pic.png"),
+                                  child: friend.profilePicUrl == null ||
+                                          friend.profilePicUrl!.isEmpty
+                                      ? Icon(Icons.person, color: Colors.white)
+                                      : null,
+                                ),
                                 title: Text(friend.name,
                                     style: TextStyle(fontSize: 18)),
                                 subtitle: Text(
-                                    "Upcoming Events: ${friend.upcomingEvents}"),
+                                  friend.upcomingEvents == 0
+                                      ? 'No Upcoming Events'
+                                      : '${friend.upcomingEvents} Upcoming Events',
+                                ),
                                 onTap: () {
                                   Navigator.push(
                                     context,
@@ -237,5 +302,20 @@ class _HomePageState extends State<HomePage> {
         },
       ),
     );
+  }
+
+  // Helper function to load a base64-encoded image from a string
+  Widget _loadBase64Image(String base64Image) {
+    try {
+      Uint8List bytes = base64Decode(base64Image);
+      return Image.memory(
+        bytes,
+        fit: BoxFit.cover, // Optional: set the fit if needed
+      );
+    } catch (e) {
+      print("Error decoding base64 image: $e");
+      return Image.asset(
+          'assets/default_profile_pic.png'); // Fallback to default image
+    }
   }
 }
