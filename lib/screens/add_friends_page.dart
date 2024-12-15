@@ -291,7 +291,14 @@ class _AddFriendsPageState extends State<AddFriendsPage> {
     return Scaffold(
       appBar: AppBar(title: Text("Add Friends")),
       body: SafeArea(
-        child: Padding(
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.blue, Colors.purple],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
@@ -312,39 +319,43 @@ class _AddFriendsPageState extends State<AddFriendsPage> {
                         incomingRequests.contains(user.id);
                     final isFriend = friends.contains(user.id);
 
-                    return ListTile(
-                      title: Text(user.name),
-                      subtitle: Text(user.email),
-                      trailing: isFriend
-                          ? Text("Friend")
-                          : isOutgoingRequest
-                              ? ElevatedButton(
-                                  onPressed: () =>
-                                      _cancelFriendRequest(user.id),
-                                  child: Text("Cancel Request"),
-                                )
-                              : isIncomingRequest
-                                  ? Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        ElevatedButton(
-                                          onPressed: () =>
-                                              _acceptFriendRequest(user.id),
-                                          child: Text("Accept"),
-                                        ),
-                                        SizedBox(width: 8),
-                                        ElevatedButton(
-                                          onPressed: () =>
-                                              _declineFriendRequest(user.id),
-                                          child: Text("Decline"),
-                                        ),
-                                      ],
-                                    )
-                                  : ElevatedButton(
-                                      onPressed: () => _sendFriendRequest(
-                                          user.id, user.name, user.email),
-                                      child: Text("Send Request"),
-                                    ),
+                    return Card(
+                      color: Colors.white.withOpacity(0.8),
+                      margin: EdgeInsets.symmetric(vertical: 8),
+                      child: ListTile(
+                        title: Text(user.name),
+                        subtitle: Text(user.email),
+                        trailing: isFriend
+                            ? Text("Friend")
+                            : isOutgoingRequest
+                                ? ElevatedButton(
+                                    onPressed: () =>
+                                        _cancelFriendRequest(user.id),
+                                    child: Text("Cancel Request"),
+                                  )
+                                : isIncomingRequest
+                                    ? Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          ElevatedButton(
+                                            onPressed: () =>
+                                                _acceptFriendRequest(user.id),
+                                            child: Text("Accept"),
+                                          ),
+                                          SizedBox(width: 8),
+                                          ElevatedButton(
+                                            onPressed: () =>
+                                                _declineFriendRequest(user.id),
+                                            child: Text("Decline"),
+                                          ),
+                                        ],
+                                      )
+                                    : ElevatedButton(
+                                        onPressed: () => _sendFriendRequest(
+                                            user.id, user.name, user.email),
+                                        child: Text("Send Request"),
+                                      ),
+                      ),
                     );
                   },
                 ),

@@ -77,28 +77,53 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // Save the profile changes
   Future<void> _saveProfile() async {
-    if (_user != null && _fullNameController.text.isNotEmpty) {
-      try {
-        // Update full name in Firestore
-        await _firestore.collection('users').doc(_user!.uid).update({
-          'fullName': _fullNameController.text,
-        });
-        // If password is provided, update it
-        if (_passwordController.text.isNotEmpty) {
-          await _user!.updatePassword(_passwordController.text);
-        }
-        // If email is different, update it
-        if (_emailController.text != _user!.email) {
-          await _user!.updateEmail(_emailController.text);
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Profile updated successfully')),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating profile: $e')),
-        );
+    if (_user == null) return;
+
+    String fullName = _fullNameController.text.trim();
+    String email = _emailController.text.trim();
+    String password = _passwordController.text.trim();
+
+    try {
+      // Step 1: Reauthenticate the user for sensitive operations
+      String currentEmail = _user!.email!;
+      String currentPassword =
+          "your_placeholder_password"; // You need to collect the current password
+      AuthCredential credential = EmailAuthProvider.credential(
+        email: currentEmail,
+        password: currentPassword,
+      );
+
+      await _user!.reauthenticateWithCredential(credential);
+
+      // Step 2: Update email if changed
+      if (email.isNotEmpty && email != _user!.email) {
+        await _user!.updateEmail(email);
       }
+
+      // Step 3: Update password if provided
+      if (password.isNotEmpty) {
+        await _user!.updatePassword(password);
+      }
+
+      // Step 4: Update Firestore fields: 'name' and 'fullName'
+      await _firestore.collection('users').doc(_user!.uid).update({
+        'name': fullName,
+        'fullName': fullName,
+        'email': email,
+      });
+
+      // Step 5: Success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Profile updated successfully')),
+      );
+
+      setState(() {
+        isEditable = false;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating profile: $e')),
+      );
     }
   }
 
@@ -108,95 +133,145 @@ class _ProfilePageState extends State<ProfilePage> {
       appBar: AppBar(title: Text("Profile")),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Profile Settings",
-                      style:
-                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 10),
-                  TextField(
-                    controller: _fullNameController,
-                    enabled: isEditable,
-                    decoration: InputDecoration(labelText: 'Full Name'),
-                  ),
-                  TextField(
-                    controller: _emailController,
-                    enabled: isEditable,
-                    decoration: InputDecoration(labelText: 'Email'),
-                  ),
-                  TextField(
-                    controller: _passwordController,
-                    enabled: isEditable,
-                    obscureText: true,
-                    decoration: InputDecoration(labelText: 'Password'),
-                  ),
-                  SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        isEditable = !isEditable;
-                      });
-                      if (isEditable) {
-                        _saveProfile();
-                      }
-                    },
-                    child: Text(isEditable ? "Save Changes" : "Edit Profile"),
-                  ),
-                  SwitchListTile(
-                    title: Text("Enable Notifications"),
-                    value: notificationsEnabled,
-                    onChanged: (value) {
-                      setState(() {
-                        notificationsEnabled = value;
-                      });
-                      // Update notification settings in Firestore or Firebase Cloud Messaging (FCM)
-                    },
-                  ),
-                  SizedBox(height: 20),
-                  Text(
-                    "Your Created Events",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 10),
-                  _createdEvents.isEmpty
-                      ? Text("You haven't created any events yet.")
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: _createdEvents.length,
-                          itemBuilder: (context, index) {
-                            return GestureDetector(
-                              onTap: () {
-                                // Navigate to the GiftsListPage with the selected event object
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => GiftListPage(
-                                        event: _createdEvents[
-                                            index]), // Pass the entire event object
-                                  ),
-                                );
-                              },
-                              child: ListTile(
-                                title: Text(_createdEvents[index].name),
-                              ),
-                            );
+          : Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.blue, Colors.purple],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: SafeArea(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Profile Settings",
+                            style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
+                        SizedBox(height: 10),
+                        TextField(
+                          controller: _fullNameController,
+                          enabled: isEditable,
+                          decoration: InputDecoration(
+                            labelText: 'Full Name',
+                            labelStyle: TextStyle(color: Colors.white),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.8),
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        TextField(
+                          controller: _emailController,
+                          enabled: isEditable,
+                          decoration: InputDecoration(
+                            labelText: 'Email',
+                            labelStyle: TextStyle(color: Colors.white),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.8),
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        TextField(
+                          controller: _passwordController,
+                          enabled: isEditable,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            labelStyle: TextStyle(color: Colors.white),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.8),
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              isEditable = !isEditable;
+                            });
+                            if (isEditable) {
+                              _saveProfile();
+                            }
+                          },
+                          child: Text(
+                              isEditable ? "Save Changes" : "Edit Profile"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueAccent,
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        SwitchListTile(
+                          title: Text("Enable Notifications",
+                              style: TextStyle(color: Colors.white)),
+                          value: notificationsEnabled,
+                          onChanged: (value) {
+                            setState(() {
+                              notificationsEnabled = value;
+                            });
+                            // Update notification settings in Firestore or Firebase Cloud Messaging (FCM)
                           },
                         ),
-                  SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => MyPledgedGiftsPage()),
-                      );
-                    },
-                    child: Text("Go to My Pledged Gifts"),
+                        SizedBox(height: 20),
+                        Text(
+                          "Your Created Events",
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white),
+                        ),
+                        SizedBox(height: 10),
+                        _createdEvents.isEmpty
+                            ? Text(
+                                "You haven't created any events yet.",
+                                style: TextStyle(color: Colors.white),
+                              )
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: _createdEvents.length,
+                                itemBuilder: (context, index) {
+                                  return GestureDetector(
+                                    onTap: () {
+                                      // Navigate to the GiftsListPage with the selected event object
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => GiftListPage(
+                                              event: _createdEvents[
+                                                  index]), // Pass the entire event object
+                                        ),
+                                      );
+                                    },
+                                    child: ListTile(
+                                      title: Text(
+                                        _createdEvents[index].name,
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                        SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => MyPledgedGiftsPage()),
+                            );
+                          },
+                          child: Text("Go to My Pledged Gifts"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purpleAccent,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
             ),
     );

@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'gifts_list_page.dart';
-import 'create_event_list_page.dart'; // Ensure this is properly imported
+import 'create_event_list_page.dart';
 import 'friend_tile.dart'; // Import the FriendTile class
 
 class Event {
@@ -213,30 +213,39 @@ class _EventListPageState extends State<EventListPage> {
           ),
         ],
       ),
-      body: filteredEvents.isEmpty
-          ? Center(child: Text('No events found.'))
-          : ListView.builder(
-              itemCount: filteredEvents.length,
-              itemBuilder: (context, index) {
-                final event = filteredEvents[index];
-                return EventTile(
-                  eventName: event.name,
-                  eventStatus: event.status,
-                  category: event.category,
-                  userId: event.userId,
-                  onEdit: () => _editEvent(index),
-                  onDelete: () => _deleteEvent(index),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => GiftListPage(event: event),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.blueAccent, Colors.purpleAccent],
+          ),
+        ),
+        child: filteredEvents.isEmpty
+            ? Center(child: Text('No events found.'))
+            : ListView.builder(
+                itemCount: filteredEvents.length,
+                itemBuilder: (context, index) {
+                  final event = filteredEvents[index];
+                  return EventTile(
+                    eventName: event.name,
+                    eventStatus: event.status,
+                    category: event.category,
+                    userId: event.userId,
+                    onEdit: () => _editEvent(index),
+                    onDelete: () => _deleteEvent(index),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => GiftListPage(event: event),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+      ),
     );
   }
 }

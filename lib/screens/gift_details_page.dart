@@ -113,49 +113,61 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
       appBar: AppBar(
         title: Text(widget.giftDetails == null ? "Add Gift" : "Edit Gift"),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              _buildTextField(
-                label: 'Gift Name',
-                initialValue: giftName,
-                onSaved: (value) => giftName = value ?? '',
-                validator: (value) {
-                  if (value!.isEmpty) return 'Please enter a gift name';
-                  return null;
-                },
-              ),
-              _buildTextField(
-                label: 'Description',
-                initialValue: description,
-                onSaved: (value) => description = value ?? '',
-              ),
-              _buildTextField(
-                label: 'Category',
-                initialValue: category,
-                onSaved: (value) => category = value ?? '',
-              ),
-              _buildTextField(
-                label: 'Price',
-                initialValue: price.toString(),
-                keyboardType: TextInputType.number,
-                onSaved: (value) =>
-                    price = double.tryParse(value ?? '0') ?? 0.0,
-              ),
-              SwitchListTile(
-                title: Text('Pledged'),
-                value: isPledged,
-                onChanged: (value) => setState(() => isPledged = value),
-              ),
-              ElevatedButton(
-                onPressed: _saveGift,
-                child: Text(
-                    widget.giftDetails == null ? "Add Gift" : "Update Gift"),
-              ),
-            ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.blueAccent,
+              Colors.greenAccent
+            ], // You can change these colors
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                _buildTextField(
+                  label: 'Gift Name',
+                  initialValue: giftName,
+                  onSaved: (value) => giftName = value ?? '',
+                  validator: (value) {
+                    if (value!.isEmpty) return 'Please enter a gift name';
+                    return null;
+                  },
+                ),
+                _buildTextField(
+                  label: 'Description',
+                  initialValue: description,
+                  onSaved: (value) => description = value ?? '',
+                ),
+                _buildTextField(
+                  label: 'Category',
+                  initialValue: category,
+                  onSaved: (value) => category = value ?? '',
+                ),
+                _buildTextField(
+                  label: 'Price',
+                  initialValue: price.toString(),
+                  keyboardType: TextInputType.number,
+                  onSaved: (value) =>
+                      price = double.tryParse(value ?? '0') ?? 0.0,
+                ),
+                SwitchListTile(
+                  title: Text('Pledged'),
+                  value: isPledged,
+                  onChanged: (value) => setState(() => isPledged = value),
+                ),
+                ElevatedButton(
+                  onPressed: _saveGift,
+                  child: Text(
+                      widget.giftDetails == null ? "Add Gift" : "Update Gift"),
+                ),
+              ],
+            ),
           ),
         ),
       ),

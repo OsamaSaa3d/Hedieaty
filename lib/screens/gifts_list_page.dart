@@ -99,54 +99,63 @@ class _GiftListPageState extends State<GiftListPage> {
           ),
         ],
       ),
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: _firestoreService.getGifts(widget.event.id),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          }
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.blueAccent, Colors.greenAccent],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _firestoreService.getGifts(widget.event.id),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            }
 
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text("No gifts available"));
-          }
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return Center(child: Text("No gifts available"));
+            }
 
-          gifts = snapshot.data!;
-          sortGifts();
-          filteredGifts = List.from(gifts);
+            gifts = snapshot.data!;
+            sortGifts();
+            filteredGifts = List.from(gifts);
 
-          return ListView.builder(
-            itemCount: filteredGifts.length,
-            itemBuilder: (context, index) {
-              final gift = filteredGifts[index];
-              final isPledged = gift['status'] == 'Pledged';
-              final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-              final pledgerId =
-                  gift['pledgerId']; // ID of the user who pledged this gift
+            return ListView.builder(
+              itemCount: filteredGifts.length,
+              itemBuilder: (context, index) {
+                final gift = filteredGifts[index];
+                final isPledged = gift['status'] == 'Pledged';
+                final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+                final pledgerId =
+                    gift['pledgerId']; // ID of the user who pledged this gift
 
-              return GiftTile(
-                giftName: gift["name"]!,
-                category: gift["category"]!,
-                status: gift["status"]!,
+                return GiftTile(
+                  giftName: gift["name"]!,
+                  category: gift["category"]!,
+                  status: gift["status"]!,
 
-                // Allow editing or deleting only if the user is the creator and the gift is not pledged
-                onEdit: (isUserCreator && !isPledged)
-                    ? () => _editGift(gifts.indexOf(gift))
-                    : null,
-                onDelete: (isUserCreator && !isPledged)
-                    ? () => _deleteGift(gifts.indexOf(gift))
-                    : null,
+                  // Allow editing or deleting only if the user is the creator and the gift is not pledged
+                  onEdit: (isUserCreator && !isPledged)
+                      ? () => _editGift(gifts.indexOf(gift))
+                      : null,
+                  onDelete: (isUserCreator && !isPledged)
+                      ? () => _deleteGift(gifts.indexOf(gift))
+                      : null,
 
-                // Pledging logic: Only allow pledging if the gift is "Available" or unpledging if the current user is the pledger
-                onPledgeChange:
-                    (isUserCreator || (isPledged && pledgerId != currentUserId))
-                        ? null // Disable the toggle for non-pledgers
-                        : (bool newValue) {
-                            _togglePledgeGift(index, newValue);
-                          },
-              );
-            },
-          );
-        },
+                  // Pledging logic: Only allow pledging if the gift is "Available" or unpledging if the current user is the pledger
+                  onPledgeChange: (isUserCreator ||
+                          (isPledged && pledgerId != currentUserId))
+                      ? null // Disable the toggle for non-pledgers
+                      : (bool newValue) {
+                          _togglePledgeGift(index, newValue);
+                        },
+                );
+              },
+            );
+          },
+        ),
       ),
       floatingActionButton: isUserCreator
           ? FloatingActionButton(

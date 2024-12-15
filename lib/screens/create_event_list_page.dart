@@ -171,85 +171,97 @@ class _CreateEventListPageState extends State<CreateEventListPage> {
       appBar: AppBar(
         title: Text("Create Event/List"),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              _buildTextField(
-                label: "Event/List Name",
-                initialValue: eventName,
-                onSaved: (value) => eventName = value,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return "Please enter an event name";
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 16),
-              _buildTextField(
-                label: "Event Description",
-                initialValue: eventDescription,
-                onSaved: (value) => eventDescription = value,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return "Please enter an event description";
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 16),
-              _buildTextField(
-                label: "Event Location",
-                initialValue: eventLocation,
-                onSaved: (value) => eventLocation = value,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return "Please enter an event location";
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 16),
-              _buildTextField(
-                label: "Event Date (YYYY-MM-DD)",
-                readOnly: true,
-                onTap: () async {
-                  FocusScope.of(context).requestFocus(FocusNode());
-                  final DateTime? pickedDate = await showDatePicker(
-                    context: context,
-                    initialDate: eventDate ?? DateTime.now(),
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2101),
-                  );
-                  if (pickedDate != null && pickedDate != eventDate) {
-                    setState(() {
-                      eventDate = pickedDate;
-                    });
-                  }
-                },
-                validator: (value) {
-                  if (eventDate == null) {
-                    return "Please select an event date";
-                  }
-                  return null;
-                },
-                initialValue: eventDate != null
-                    ? "${eventDate!.toLocal()}".split(' ')[0]
-                    : '',
-              ),
-              SizedBox(height: 16),
-              _buildCategoryDropdown(),
-              SizedBox(height: 16),
-              _buildStatusDropdown(),
-              SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _saveEvent,
-                child: Text("Save Event/List"),
-              ),
-            ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.blue,
+              Colors.green
+            ], // Change to your preferred colors
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                _buildTextField(
+                  label: "Event/List Name",
+                  initialValue: eventName,
+                  onSaved: (value) => eventName = value,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return "Please enter an event name";
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: 16),
+                _buildTextField(
+                  label: "Event Description",
+                  initialValue: eventDescription,
+                  onSaved: (value) => eventDescription = value,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return "Please enter an event description";
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: 16),
+                _buildTextField(
+                  label: "Event Location",
+                  initialValue: eventLocation,
+                  onSaved: (value) => eventLocation = value,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return "Please enter an event location";
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: 16),
+                _buildTextField(
+                  label: "Event Date (YYYY-MM-DD)",
+                  readOnly: true,
+                  onTap: () async {
+                    FocusScope.of(context).requestFocus(FocusNode());
+                    final DateTime? pickedDate = await showDatePicker(
+                      context: context,
+                      initialDate: eventDate ?? DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2101),
+                    );
+                    if (pickedDate != null && pickedDate != eventDate) {
+                      setState(() {
+                        eventDate = pickedDate;
+                      });
+                    }
+                  },
+                  validator: (value) {
+                    if (eventDate == null) {
+                      return "Please select an event date";
+                    }
+                    return null;
+                  },
+                  initialValue: eventDate != null
+                      ? "${eventDate!.toLocal()}".split(' ')[0]
+                      : '',
+                ),
+                SizedBox(height: 16),
+                _buildCategoryDropdown(),
+                SizedBox(height: 16),
+                _buildStatusDropdown(),
+                SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _saveEvent,
+                  child: Text("Save Event/List"),
+                ),
+              ],
+            ),
           ),
         ),
       ),

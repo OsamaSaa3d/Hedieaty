@@ -41,7 +41,6 @@ class _MyPledgedGiftsPageState extends State<MyPledgedGiftsPage> {
         // Check if the current user is the pledger
         if (giftData['pledgerId'] == _user!.uid) {
           // If the user has pledged this gift, fetch additional data
-          // print(giftData['name']);
           var userSnapshot = await _firestore
               .collection('users')
               .doc(eventDoc['userId'])
@@ -132,38 +131,78 @@ class _MyPledgedGiftsPageState extends State<MyPledgedGiftsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text("My Pledged Gifts")),
-      body: _pledgedGifts.isEmpty
-          ? Center(child: Text("You haven't pledged any gifts yet."))
-          : ListView.builder(
-              itemCount: _pledgedGifts.length,
-              itemBuilder: (context, index) {
-                final gift = _pledgedGifts[index];
-                return Card(
-                  margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                  child: ListTile(
-                    title: Text(gift['giftName'],
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Event: ${gift['eventName']}"),
-                        Text("Pledged for: ${gift['eventCreator']}"),
-                        Text("Date: ${gift['eventDate']}"),
-                      ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.blueAccent, Colors.purple],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: _pledgedGifts.isEmpty
+            ? Center(
+                child: Text(
+                  "You haven't pledged any gifts yet.",
+                  style: TextStyle(fontSize: 18, color: Colors.white),
+                ),
+              )
+            : ListView.builder(
+                itemCount: _pledgedGifts.length,
+                itemBuilder: (context, index) {
+                  final gift = _pledgedGifts[index];
+                  return Card(
+                    margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    elevation: 5,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    // Adding the "Unpledge" button if the event date is in the future
-                    trailing: gift['canUnpledge']
-                        ? ElevatedButton(
-                            onPressed: () {
-                              _unpledgeGift(gift['giftId'], gift['eventId']);
-                            },
-                            child: Text("Unpledge"),
-                          )
-                        : null,
-                  ),
-                );
-              },
-            ),
+                    child: ListTile(
+                      contentPadding: EdgeInsets.all(16),
+                      title: Text(
+                        gift['giftName'],
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(height: 5),
+                          Text(
+                            "Event: ${gift['eventName']}",
+                            style: TextStyle(color: Colors.grey[700]),
+                          ),
+                          Text(
+                            "Pledged for: ${gift['eventCreator']}",
+                            style: TextStyle(color: Colors.grey[700]),
+                          ),
+                          Text(
+                            "Date: ${gift['eventDate']}",
+                            style: TextStyle(color: Colors.grey[700]),
+                          ),
+                        ],
+                      ),
+                      trailing: gift['canUnpledge']
+                          ? ElevatedButton(
+                              onPressed: () {
+                                _unpledgeGift(gift['giftId'], gift['eventId']);
+                              },
+                              child: Text("Unpledge"),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                  );
+                },
+              ),
+      ),
     );
   }
 }
