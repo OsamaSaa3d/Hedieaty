@@ -133,6 +133,45 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Future<List<Friend>> _combineFriendsData(
+      List<QueryDocumentSnapshot> friendsDocs) async {
+    final List<Friend> loadedFriends = [];
+
+    for (final doc in friendsDocs) {
+      final data = doc.data() as Map<String, dynamic>;
+
+      // Check if the current user is part of the friendship (either userId1 or userId2)
+      if (data['userId1'] == currentUserId ||
+          data['userId2'] == currentUserId) {
+        // Get the friend ID (the one that is not the current user)
+        final friendId = data['userId1'] == currentUserId
+            ? data['userId2']
+            : data['userId1'];
+
+        // Fetch the user profile data for the friend
+        final userDoc =
+            await _firestore.collection('users').doc(friendId).get();
+        final userData = userDoc.data() as Map<String, dynamic>?;
+
+        // Get the upcoming events count for the friend
+        final upcomingEventsCount = await _fetchUpcomingEvents(friendId);
+
+        // Create a Friend instance and add it to the list
+        loadedFriends.add(Friend.fromMap(
+          {
+            ...data,
+            'profilePicUrl': userData?['profilePicUrl'] ?? '',
+            'upcomingEvents': upcomingEventsCount,
+          },
+          friendId,
+          currentUserId!,
+        ));
+      }
+    }
+
+    return loadedFriends;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -200,70 +239,89 @@ class _HomePageState extends State<HomePage> {
             ),
 
             Expanded(
-              child: isLoading
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 10),
-                          Text(
-                            "Loading...",
-                            style: TextStyle(color: Colors.white, fontSize: 16),
-                          ),
-                        ],
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _firestore.collection('friends').snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        "Error loading friends!",
+                        style: TextStyle(color: Colors.white),
                       ),
-                    )
-                  : friends.isEmpty
-                      ? Center(
+                    );
+                  }
+
+                  // Combine friends where userId1 or userId2 matches current user
+                  final friendsDocs = snapshot.data?.docs ?? [];
+
+                  return FutureBuilder(
+                    future: _combineFriendsData(friendsDocs),
+                    builder: (context,
+                        AsyncSnapshot<List<Friend>> combinedSnapshot) {
+                      if (combinedSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return Center(child: CircularProgressIndicator());
+                      }
+
+                      final loadedFriends = combinedSnapshot.data ?? [];
+
+                      if (loadedFriends.isEmpty) {
+                        return Center(
                           child: Text(
                             "You don't have any friends yet. Start sending some friend requests!",
                             style: TextStyle(color: Colors.white, fontSize: 16),
                           ),
-                        )
-                      : ListView.builder(
-                          itemCount: filteredFriends.length,
-                          itemBuilder: (context, index) {
-                            final friend = filteredFriends[index];
-                            return Card(
-                              margin: EdgeInsets.symmetric(
-                                  vertical: 5, horizontal: 16),
-                              color: Colors.white,
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundImage:
-                                      friend.profilePicUrl != null &&
-                                              friend.profilePicUrl!.isNotEmpty
-                                          ? Image.memory(base64Decode(
-                                                  friend.profilePicUrl!))
-                                              .image
-                                          : const AssetImage(
-                                              "assets/default_profile_pic.png"),
-                                  child: friend.profilePicUrl == null ||
-                                          friend.profilePicUrl!.isEmpty
-                                      ? Icon(Icons.person, color: Colors.white)
-                                      : null,
-                                ),
-                                title: Text(friend.name,
-                                    style: TextStyle(fontSize: 18)),
-                                subtitle: Text(
-                                  friend.upcomingEvents == 0
-                                      ? 'No Upcoming Events'
-                                      : '${friend.upcomingEvents} Upcoming Events',
-                                ),
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          EventListPage(friend: friend),
-                                    ),
-                                  );
-                                },
+                        );
+                      }
+
+                      return ListView.builder(
+                        itemCount: loadedFriends.length,
+                        itemBuilder: (context, index) {
+                          final friend = loadedFriends[index];
+                          return Card(
+                            margin: EdgeInsets.symmetric(
+                                vertical: 5, horizontal: 16),
+                            color: Colors.white,
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundImage: friend.profilePicUrl != null &&
+                                        friend.profilePicUrl!.isNotEmpty
+                                    ? Image.memory(
+                                            base64Decode(friend.profilePicUrl!))
+                                        .image
+                                    : const AssetImage(
+                                        "assets/default_profile_pic.png"),
                               ),
-                            );
-                          },
-                        ),
+                              title: Text(friend.name,
+                                  style: TextStyle(fontSize: 18)),
+                              subtitle: Text(
+                                friend.upcomingEvents == 0
+                                    ? 'No Upcoming Events'
+                                    : '${friend.upcomingEvents} Upcoming Events',
+                              ),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        EventListPage(friend: friend),
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),

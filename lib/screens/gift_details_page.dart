@@ -1,5 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 class GiftDetailsPage extends StatefulWidget {
   final Map<String, dynamic>?
@@ -21,6 +24,8 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
   late double price;
   bool isPledged = false;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  File? _imageFile;
+  String? _imageBase64;
 
   @override
   void initState() {
@@ -34,6 +39,7 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
       category = gift["category"] != null ? gift["category"] as String : '';
       price = gift["price"] != null ? (gift["price"] as num).toDouble() : 0.0;
       isPledged = (gift["status"] == "Pledged");
+      _imageBase64 = gift["image"]; // If image exists in Firestore, get it
     } else {
       // Default values for a new gift
       giftName = '';
@@ -41,6 +47,21 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
       category = '';
       price = 0.0;
       isPledged = false;
+    }
+  }
+
+  // Method to pick an image
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      final imageFile = File(pickedFile.path);
+      setState(() {
+        _imageFile = imageFile;
+        _imageBase64 = base64Encode(
+            imageFile.readAsBytesSync()); // Encode the image as base64
+      });
     }
   }
 
@@ -55,16 +76,19 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
             .doc(widget.eventId)
             .collection('gifts');
 
+        final giftData = {
+          "name": giftName,
+          "description": description,
+          "category": category,
+          "price": price,
+          "status": isPledged ? "Pledged" : "Available",
+          "image": _imageBase64, // Add the base64 image data here
+          "PledgerId": null,
+        };
+
         if (widget.giftDetails != null && widget.giftDetails!["id"] != null) {
           // Update existing gift
-          await giftsCollection.doc(widget.giftDetails!["id"]).update({
-            "name": giftName,
-            "description": description,
-            "category": category,
-            "price": price,
-            "status": isPledged ? "Pledged" : "Available",
-          });
-
+          await giftsCollection.doc(widget.giftDetails!["id"]).update(giftData);
           Navigator.pop(context, {
             "id": widget.giftDetails!['id'],
             "name": giftName,
@@ -72,23 +96,13 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
             "category": category,
             "price": price,
             "status": isPledged ? "Pledged" : "Available",
+            "image": _imageBase64,
             "PledgerId": null,
           });
         } else {
           // Add new gift
-          final newGiftRef = await giftsCollection.add({
-            "name": giftName,
-            "description": description,
-            "category": category,
-            "price": price,
-            "status": isPledged ? "Pledged" : "Available",
-            "PledgerId": null,
-          });
-
-          // Get the generated ID
+          final newGiftRef = await giftsCollection.add(giftData);
           String generatedId = newGiftRef.id;
-
-          // Update the gift with the ID in Firestore
           await newGiftRef.update({"id": generatedId});
 
           Navigator.pop(context, {
@@ -98,6 +112,7 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
             "category": category,
             "price": price,
             "status": isPledged ? "Pledged" : "Available",
+            "image": _imageBase64,
             "PledgerId": null,
           });
         }
@@ -160,6 +175,34 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
                   title: Text('Pledged'),
                   value: isPledged,
                   onChanged: (value) => setState(() => isPledged = value),
+                ),
+                // Image picker button
+                GestureDetector(
+                  onTap: _pickImage,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: _imageFile == null && _imageBase64 == null
+                        ? Icon(Icons.add_a_photo, size: 50, color: Colors.white)
+                        : _imageFile != null
+                            ? Image.file(
+                                _imageFile!,
+                                width:
+                                    100, // Set the width to limit the image size
+                                height:
+                                    100, // Set the height to limit the image size
+                                fit: BoxFit
+                                    .cover, // This will ensure the image scales proportionally
+                              )
+                            : Image.memory(
+                                base64Decode(_imageBase64!),
+                                width:
+                                    100, // Set the width to limit the image size
+                                height:
+                                    100, // Set the height to limit the image size
+                                fit: BoxFit
+                                    .cover, // This will ensure the image scales proportionally
+                              ),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: _saveGift,

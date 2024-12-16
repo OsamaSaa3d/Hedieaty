@@ -60,44 +60,24 @@ class _EventListPageState extends State<EventListPage> {
   @override
   void initState() {
     super.initState();
-    _fetchEvents();
-  }
-
-  // Fetch events from Firestore
-  Future<void> _fetchEvents() async {
-    User? user = _auth.currentUser;
-
-    if (user != null) {
-      try {
-        // Fetch events related to the friend's userId from the 'events' collection
-        QuerySnapshot snapshot = await _firestore
-            .collection('events')
-            .where('userId', isEqualTo: widget.friend.id)
-            .get();
-
-        // Populate the events list with fetched data
-        setState(() {
-          events = snapshot.docs.map((doc) {
-            return Event.fromFirestore(doc);
-          }).toList();
-          filteredEvents = List.from(events); // Initialize filteredEvents here
-        });
-      } catch (e) {
-        print("Error fetching events: $e");
-      }
-    }
+    filteredEvents = List.from(events); // Initialize filteredEvents
   }
 
   // Sort events based on criteria
   void sortEvents() {
-    setState(() {
-      events.sort((a, b) {
-        if (sortCriteria == "name") return a.name.compareTo(b.name);
-        if (sortCriteria == "category") return a.category.compareTo(b.category);
-        if (sortCriteria == "status") return a.status.compareTo(b.status);
-        return 0;
+    // Use WidgetsBinding to avoid calling setState directly during the build phase
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(() {
+        events.sort((a, b) {
+          if (sortCriteria == "name") return a.name.compareTo(b.name);
+          if (sortCriteria == "category")
+            return a.category.compareTo(b.category);
+          if (sortCriteria == "status") return a.status.compareTo(b.status);
+          return 0;
+        });
+        filteredEvents =
+            List.from(events); // Update filteredEvents after sorting
       });
-      filteredEvents = List.from(events); // Update filteredEvents after sorting
     });
   }
 
@@ -145,15 +125,15 @@ class _EventListPageState extends State<EventListPage> {
   void _deleteEvent(int index) {
     final event = events[index];
 
-    setState(() {
-      events.removeAt(index);
-    });
-
     // Remove event from Firestore
-    _firestore
-        .collection('events') // Fix path here
-        .doc(event.id)
-        .delete();
+    _firestore.collection('events').doc(event.id).delete().then((_) {
+      // Since the StreamBuilder is already listening to Firestore, no need for local setState() here
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Event deleted successfully!'),
+      ));
+    }).catchError((e) {
+      print("Error deleting event: $e");
+    });
   }
 
   // Modify the _filterEvents method to update filteredEvents properly
@@ -198,7 +178,6 @@ class _EventListPageState extends State<EventListPage> {
         ),
         actions: [
           PopupMenuButton<String>(
-            // Sorting menu
             onSelected: (value) {
               setState(() {
                 sortCriteria = value;
@@ -218,33 +197,71 @@ class _EventListPageState extends State<EventListPage> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.blueAccent, Colors.purpleAccent],
+            colors: [Colors.blue, Colors.purple], // Gradient colors
           ),
         ),
-        child: filteredEvents.isEmpty
-            ? Center(child: Text('No events found.'))
-            : ListView.builder(
-                itemCount: filteredEvents.length,
-                itemBuilder: (context, index) {
-                  final event = filteredEvents[index];
-                  return EventTile(
-                    eventName: event.name,
-                    eventStatus: event.status,
-                    category: event.category,
-                    userId: event.userId,
-                    onEdit: () => _editEvent(index),
-                    onDelete: () => _deleteEvent(index),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => GiftListPage(event: event),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+        child: StreamBuilder<QuerySnapshot>(
+          stream: _firestore
+              .collection('events')
+              .where('userId', isEqualTo: widget.friend.id)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            }
+
+            if (snapshot.hasError) {
+              return Center(child: Text('Error fetching events'));
+            }
+
+            if (snapshot.hasData) {
+              events = snapshot.data!.docs.map((doc) {
+                return Event.fromFirestore(doc);
+              }).toList();
+
+              if (filteredEvents.isEmpty) {
+                sortEvents();
+              }
+
+              return filteredEvents.isEmpty
+                  ? Center(child: Text('No events found.'))
+                  : ListView.builder(
+                      itemCount: filteredEvents.length,
+                      itemBuilder: (context, index) {
+                        final event = filteredEvents[index];
+                        return EventTile(
+                          eventName: event.name,
+                          eventStatus: event.status,
+                          category: event.category,
+                          userId: event.userId,
+                          onEdit: () => _editEvent(index),
+                          onDelete: () => _deleteEvent(index),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    GiftListPage(event: event),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    );
+            }
+
+            return Center(child: Text('No events found.'));
+          },
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => CreateEventListPage()),
+          );
+        },
+        child: Icon(Icons.add),
       ),
     );
   }
