@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lab3/screens/my_gifts_got_pledged_page.dart';
 import 'package:lab3/screens/my_pledged_gifts_page.dart';
 import 'package:lab3/screens/gifts_list_page.dart'; // Import the GiftsListPage
 import 'package:lab3/screens/events_list_page.dart'; // Import the EventListPage
@@ -23,6 +24,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool _isNameSelected = false;
+  bool _isEmailSelected = false;
+  bool _isPasswordSelected = false;
 
   User? _user;
   bool _isLoading = true;
@@ -146,55 +150,170 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // Save the profile changes
   Future<void> _saveProfile() async {
-    if (_user == null) return;
-
     String fullName = _fullNameController.text.trim();
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
 
+    // Step 1: Show a dialog to ask the user which fields they want to change
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Confirm Changes'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text("Please select the fields you want to update:"),
+                  CheckboxListTile(
+                    title: Text('Name'),
+                    value: _isNameSelected,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        _isNameSelected = value ?? false; // Update the state
+                      });
+                    },
+                  ),
+                  CheckboxListTile(
+                    title: Text('Email'),
+                    value: _isEmailSelected,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        _isEmailSelected = value ?? false; // Update the state
+                      });
+                    },
+                  ),
+                  CheckboxListTile(
+                    title: Text('Password'),
+                    value: _isPasswordSelected,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        _isPasswordSelected =
+                            value ?? false; // Update the state
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context, false); // User pressed Cancel
+                  },
+                  child: Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context, true); // User pressed Confirm
+                  },
+                  child: Text('Confirm'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirm != true) return; // If user canceled, don't proceed
+
+    // Step 2: Ask for the current password if password is selected
+    String currentPassword = "";
+    if (_isPasswordSelected) {
+      currentPassword =
+          await _getCurrentPassword(); // Ask the user for the password
+      if (currentPassword.isEmpty) return; // If the password is empty, stop
+    }
+
+    // Step 3: Reauthenticate the user only if password was selected
     try {
-      // Step 1: Reauthenticate the user for sensitive operations
-      String currentEmail = _user!.email!;
-      String currentPassword =
-          "your_placeholder_password"; // Use current password input
-      AuthCredential credential = EmailAuthProvider.credential(
-        email: currentEmail,
-        password: currentPassword,
-      );
+      if (_isPasswordSelected) {
+        AuthCredential credential = EmailAuthProvider.credential(
+          email: _user!.email!,
+          password: currentPassword,
+        );
 
-      await _user!.reauthenticateWithCredential(credential);
-
-      // Step 2: Update email if changed
-      if (email.isNotEmpty && email != _user!.email) {
-        await _user!.updateEmail(email);
+        await _user!.reauthenticateWithCredential(credential);
       }
 
-      // Step 3: Update password if provided
-      if (password.isNotEmpty) {
-        await _user!.updatePassword(password);
+      // Step 4: Update profile details based on user selection
+      if (_isNameSelected &&
+          fullName.isNotEmpty &&
+          fullName != _user!.displayName) {
+        await _firestore.collection('users').doc(_user!.uid).update({
+          'name': fullName,
+        });
       }
 
-      // Step 4: Update Firestore fields: 'name' and 'fullName'
-      await _firestore.collection('users').doc(_user!.uid).update({
-        'name': fullName,
-        'fullName': fullName,
-        'email': email,
+      if (_isEmailSelected && email.isNotEmpty && email != _user!.email) {
+        await _user!.verifyBeforeUpdateEmail(
+            email); // Update email in Firebase Authentication
+        await _firestore.collection('users').doc(_user!.uid).update({
+          'email': email, // Update email in Firestore
+        });
+      }
+
+      if (_isPasswordSelected && password.isNotEmpty) {
+        await _user!.updatePassword(password); // Update password if selected
+      }
+
+      // After saving, make fields uneditable again
+      setState(() {
+        isEditable = false;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Profile updated successfully')),
       );
-
-      setState(() {
-        isEditable = false;
-      });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error updating profile: $e')),
       );
     }
+  }
+
+// Function to prompt the user for their current password
+  Future<String> _getCurrentPassword() async {
+    String password = "";
+    bool? passwordConfirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Confirm Password'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("To save changes, please enter your current password."),
+              TextField(
+                obscureText: true,
+                decoration: InputDecoration(labelText: 'Current Password'),
+                onChanged: (value) {
+                  password = value.trim(); // Update the password variable
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, false); // User pressed Cancel
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, true); // User pressed Confirm
+              },
+              child: Text('Confirm'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return password; // Return the entered password
   }
 
   Image _getProfileImage() {
@@ -218,6 +337,7 @@ class _ProfilePageState extends State<ProfilePage> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : Container(
+              height: double.infinity,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Colors.blue, Colors.purple],
@@ -291,11 +411,12 @@ class _ProfilePageState extends State<ProfilePage> {
                         SizedBox(height: 10),
                         ElevatedButton(
                           onPressed: () {
-                            setState(() {
-                              isEditable = !isEditable;
-                            });
                             if (isEditable) {
                               _saveProfile();
+                            } else {
+                              setState(() {
+                                isEditable = !isEditable;
+                              });
                             }
                           },
                           child: Text(
@@ -304,6 +425,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             backgroundColor: Colors.blueAccent,
                           ),
                         ),
+
                         SizedBox(height: 10),
                         SwitchListTile(
                           title: Text("Enable Notifications",
@@ -316,36 +438,34 @@ class _ProfilePageState extends State<ProfilePage> {
                           },
                         ),
                         SizedBox(height: 20),
-                        Text(
-                          "Your Created Events",
-                          style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => MyPledgedGiftsPage()),
+                            );
+                          },
+                          child: Text('Go to My Pledged Gifts'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueAccent,
+                          ),
                         ),
-                        SizedBox(height: 10),
-                        _createdEvents.isEmpty
-                            ? Text(
-                                "You haven't created any events yet.",
-                                style: TextStyle(color: Colors.white),
-                              )
-                            : ListView.builder(
-                                shrinkWrap: true,
-                                itemCount: _createdEvents.length,
-                                itemBuilder: (context, index) {
-                                  return GestureDetector(
-                                    onTap: () {
-                                      // Handle event tap
-                                    },
-                                    child: ListTile(
-                                      title: Text(
-                                        _createdEvents[index].name,
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                    ),
-                                  );
-                                },
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    MyGiftsGotPledgedPage(), // Navigate to your pledged gifts page
                               ),
+                            );
+                          },
+                          child: Text('Go to My Gifts that Got pledged'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueAccent,
+                          ),
+                        )
                       ],
                     ),
                   ),

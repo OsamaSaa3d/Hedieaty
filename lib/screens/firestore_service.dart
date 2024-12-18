@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lab3/screens/events_list_page.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -60,6 +61,18 @@ class FirestoreService {
         .update({
       'status': status,
       'pledgerId': pledgerId,
+    });
+  }
+
+  // This function fetches the events for a specific user
+  Stream<List<Event>> getEventsForUser(String userId) {
+    return _db
+        .collection('events')
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+      // Map each document snapshot to an Event object
+      return snapshot.docs.map((doc) => Event.fromFirestore(doc)).toList();
     });
   }
 

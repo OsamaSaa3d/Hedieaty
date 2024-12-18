@@ -108,13 +108,9 @@ class _HomePageState extends State<HomePage> {
         ));
       }
 
-      for (final friend in loadedFriends) {
-        print('Friend: ${friend.name}, ProfilePicUrl: ${friend.profilePicUrl}');
-      }
-
       setState(() {
         friends = loadedFriends;
-        filteredFriends = loadedFriends;
+        filteredFriends = loadedFriends; // Initially show all friends
         isLoading = false; // Set loading to false after data is fetched
       });
     } catch (e) {
@@ -239,89 +235,54 @@ class _HomePageState extends State<HomePage> {
             ),
 
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: _firestore.collection('friends').snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        "Error loading friends!",
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    );
-                  }
-
-                  // Combine friends where userId1 or userId2 matches current user
-                  final friendsDocs = snapshot.data?.docs ?? [];
-
-                  return FutureBuilder(
-                    future: _combineFriendsData(friendsDocs),
-                    builder: (context,
-                        AsyncSnapshot<List<Friend>> combinedSnapshot) {
-                      if (combinedSnapshot.connectionState ==
-                          ConnectionState.waiting) {
-                        return Center(child: CircularProgressIndicator());
-                      }
-
-                      final loadedFriends = combinedSnapshot.data ?? [];
-
-                      if (loadedFriends.isEmpty) {
-                        return Center(
+              child: isLoading
+                  ? Center(child: CircularProgressIndicator())
+                  : filteredFriends.isEmpty
+                      ? Center(
                           child: Text(
-                            "You don't have any friends yet. Start sending some friend requests!",
-                            style: TextStyle(color: Colors.white, fontSize: 16),
+                            "No friends found.",
+                            style: TextStyle(color: Colors.white),
                           ),
-                        );
-                      }
-
-                      return ListView.builder(
-                        itemCount: loadedFriends.length,
-                        itemBuilder: (context, index) {
-                          final friend = loadedFriends[index];
-                          return Card(
-                            margin: EdgeInsets.symmetric(
-                                vertical: 5, horizontal: 16),
-                            color: Colors.white,
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundImage: friend.profilePicUrl != null &&
-                                        friend.profilePicUrl!.isNotEmpty
-                                    ? Image.memory(
-                                            base64Decode(friend.profilePicUrl!))
-                                        .image
-                                    : const AssetImage(
-                                        "assets/default_profile_pic.png"),
+                        )
+                      : ListView.builder(
+                          itemCount: filteredFriends.length,
+                          itemBuilder: (context, index) {
+                            final friend = filteredFriends[index];
+                            return Card(
+                              margin: EdgeInsets.symmetric(
+                                  vertical: 5, horizontal: 16),
+                              color: Colors.white,
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundImage:
+                                      friend.profilePicUrl != null &&
+                                              friend.profilePicUrl!.isNotEmpty
+                                          ? Image.memory(base64Decode(
+                                                  friend.profilePicUrl!))
+                                              .image
+                                          : const AssetImage(
+                                              "assets/default_profile_pic.png"),
+                                ),
+                                title: Text(friend.name,
+                                    style: TextStyle(fontSize: 18)),
+                                subtitle: Text(
+                                  friend.upcomingEvents == 0
+                                      ? 'No Upcoming Events'
+                                      : '${friend.upcomingEvents} Upcoming Events',
+                                ),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          EventListPage(friend: friend),
+                                    ),
+                                  );
+                                },
                               ),
-                              title: Text(friend.name,
-                                  style: TextStyle(fontSize: 18)),
-                              subtitle: Text(
-                                friend.upcomingEvents == 0
-                                    ? 'No Upcoming Events'
-                                    : '${friend.upcomingEvents} Upcoming Events',
-                              ),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        EventListPage(friend: friend),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
+                            );
+                          },
+                        ),
             ),
           ],
         ),
@@ -349,7 +310,7 @@ class _HomePageState extends State<HomePage> {
               MaterialPageRoute(
                 builder: (context) => EventListPage(
                   friend: Friend(
-                    name: 'My Events',
+                    name: 'My',
                     id: currentUserId ?? '',
                     upcomingEvents: 0,
                   ),

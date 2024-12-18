@@ -3,6 +3,7 @@ import 'package:lab3/screens/events_list_page.dart';
 import 'gift_details_page.dart'; // Ensure this is imported
 import 'firestore_service.dart'; // Import the FirestoreService
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
 
 class GiftListPage extends StatefulWidget {
   final Event event;
@@ -19,7 +20,7 @@ class _GiftListPageState extends State<GiftListPage> {
   List<Map<String, dynamic>> filteredGifts = [];
   String sortCriteria = "name";
   bool isUserCreator = false;
-
+  String query = '';
   @override
   void initState() {
     super.initState();
@@ -28,17 +29,15 @@ class _GiftListPageState extends State<GiftListPage> {
   }
 
   void _filterGifts(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        filteredGifts = List.from(gifts); // Show all gifts if query is empty
-      } else {
-        filteredGifts = gifts.where((gift) {
-          return gift['name']
-              .toLowerCase()
-              .contains(query.toLowerCase()); // Filter only by name
-        }).toList();
-      }
-    });
+    if (query.isEmpty) {
+      // If the query is empty, show all gifts
+      filteredGifts = List.from(gifts);
+    } else {
+      // Otherwise, filter gifts by name
+      filteredGifts = gifts.where((gift) {
+        return gift['name']!.toLowerCase().contains(query.toLowerCase());
+      }).toList();
+    }
   }
 
   // Function to check if the current user is the creator of the event
@@ -69,7 +68,11 @@ class _GiftListPageState extends State<GiftListPage> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: TextField(
-              onChanged: (value) => _filterGifts(value),
+              onChanged: (value) {
+                setState(() {
+                  query = value; // Store the input value in the query variable
+                });
+              },
               decoration: InputDecoration(
                 hintText: "Search gifts...",
                 prefixIcon: Icon(Icons.search),
@@ -121,6 +124,7 @@ class _GiftListPageState extends State<GiftListPage> {
             gifts = snapshot.data!;
             sortGifts();
             filteredGifts = List.from(gifts);
+            _filterGifts(query);
 
             return ListView.builder(
               itemCount: filteredGifts.length,
@@ -135,6 +139,7 @@ class _GiftListPageState extends State<GiftListPage> {
                   giftName: gift["name"]!,
                   category: gift["category"]!,
                   status: gift["status"]!,
+                  imageBase64: gift.containsKey("image") ? gift["image"] : "",
 
                   // Allow editing or deleting only if the user is the creator and the gift is not pledged
                   onEdit: (isUserCreator && !isPledged)
@@ -309,6 +314,7 @@ class GiftTile extends StatelessWidget {
   final VoidCallback? onDelete;
   final ValueChanged<bool>?
       onPledgeChange; // Callback for toggling pledge state
+  final String? imageBase64;
 
   GiftTile({
     required this.giftName,
@@ -317,20 +323,158 @@ class GiftTile extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.onPledgeChange,
+    this.imageBase64,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Check if there's an image in base64, otherwise use a default image
+
+    // Widget giftImage = imageBase64 != null && imageBase64!.isNotEmpty
+    //     ? Image.memory(
+    //         base64Decode(imageBase64!),
+    //         fit: BoxFit.cover,
+    //         width: 50,
+    //         height: 50,
+    //         errorBuilder: (context, error, stackTrace) {
+    //           return Image.asset(
+    //             'assets/default_gift_image.png',
+    //             fit: BoxFit.cover,
+    //             width: 50,
+    //             height: 50,
+    //           );
+    //         },
+    //       )
+    //     : Image.asset(
+    //         'assets/default_gift_image.png',
+    //         fit: BoxFit.cover,
+    //         width: 50,
+    //         height: 50,
+    //       );
+
+    Widget giftImage = imageBase64 != null && imageBase64!.isNotEmpty
+        ? (() {
+            try {
+              // Attempt to decode the base64 string
+              return Image.memory(
+                base64Decode(imageBase64!),
+                fit: BoxFit.cover,
+                width: 50,
+                height: 50,
+                errorBuilder: (context, error, stackTrace) {
+                  // If any error occurs in Image.memory, show the default image
+                  return Image.asset(
+                    'assets/default_gift_image.png',
+                    fit: BoxFit.cover,
+                    width: 50,
+                    height: 50,
+                  );
+                },
+              );
+            } catch (e) {
+              // If any exception occurs during decoding, fallback to the default image
+              return Image.asset(
+                'assets/default_gift_image.png',
+                fit: BoxFit.cover,
+                width: 50,
+                height: 50,
+              );
+            }
+          })()
+        : Image.asset(
+            'assets/default_gift_image.png',
+            fit: BoxFit.cover,
+            width: 50,
+            height: 50,
+          );
+
     Color statusColor = status == "Pledged"
         ? Colors.orange
         : (status == "Available" ? Colors.green : Colors.grey);
+    void _showGiftDetails(BuildContext context, String giftName,
+        String category, String status, String? imageBase64) {
+      // Add image parameter
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            backgroundColor: Colors.blueAccent,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Display the gift image
+                  imageBase64 != null && imageBase64.isNotEmpty
+                      ? Image.memory(
+                          base64Decode(imageBase64),
+                          fit: BoxFit.cover,
+                          height: 150,
+                          width: 150,
+                        )
+                      : Image.asset(
+                          'assets/default_gift_image.png', // Default image
+                          fit: BoxFit.cover,
+                          height: 150,
+                          width: 150,
+                        ),
+                  SizedBox(height: 16),
+                  // Display gift details
+                  Text(
+                    giftName,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    "Category: $category",
+                    style: TextStyle(fontSize: 18, color: Colors.white70),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    "Status: $status",
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: status == "Pledged"
+                          ? Colors.orange
+                          : const Color.fromARGB(255, 168, 36, 139),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  // Close button
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: Text(
+                      "Close",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
 
     return Card(
       margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: ListTile(
+        leading: giftImage,
         title: Text(giftName, style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text("Category: $category, Status: $status",
             style: TextStyle(color: statusColor)),
+        onTap: () {
+          _showGiftDetails(context, giftName, category, status, imageBase64);
+        },
         trailing: Wrap(
           spacing: 12,
           children: [
@@ -346,27 +490,10 @@ class GiftTile extends StatelessWidget {
               ),
             if (onPledgeChange != null)
               Switch(
-                value:
-                    status == "Pledged", // Switch is ON if status is "Pledged"
+                value: status == "Pledged",
                 onChanged: (bool value) {
-                  final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-
-                  // Prevent changing the pledge status if:
-                  // 1. The gift is already pledged by another user
-                  // 2. The current user isn't the pledger
-                  if (status == "Pledged" && currentUserId != null) {
-                    // Call onPledgeChange only if the user is the pledger
-                    if (onPledgeChange != null) {
-                      onPledgeChange!(value);
-                    } else {
-                      print("You don't have permission to unpledge this gift.");
-                    }
-                  }
-                  // Allow pledging if the gift is "Available"
-                  else if (status == "Available" && currentUserId != null) {
-                    if (onPledgeChange != null) {
-                      onPledgeChange!(value);
-                    }
+                  if (onPledgeChange != null) {
+                    onPledgeChange!(value);
                   }
                 },
                 activeColor: Colors.blue,

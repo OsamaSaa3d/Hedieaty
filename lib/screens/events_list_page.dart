@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:lab3/screens/firestore_service.dart';
 import 'gifts_list_page.dart';
 import 'create_event_list_page.dart';
 import 'friend_tile.dart'; // Import the FriendTile class
@@ -56,6 +57,8 @@ class _EventListPageState extends State<EventListPage> {
   List<Event> events = [];
   List<Event> filteredEvents = [];
   String sortCriteria = "name";
+  String query = "";
+  final FirestoreService _firestoreService = FirestoreService();
 
   @override
   void initState() {
@@ -65,20 +68,21 @@ class _EventListPageState extends State<EventListPage> {
 
   // Sort events based on criteria
   void sortEvents() {
-    // Use WidgetsBinding to avoid calling setState directly during the build phase
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() {
-        events.sort((a, b) {
-          if (sortCriteria == "name") return a.name.compareTo(b.name);
-          if (sortCriteria == "category")
-            return a.category.compareTo(b.category);
-          if (sortCriteria == "status") return a.status.compareTo(b.status);
-          return 0;
-        });
-        filteredEvents =
-            List.from(events); // Update filteredEvents after sorting
-      });
+    events.sort((a, b) {
+      if (sortCriteria == "name") {
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      }
+      if (sortCriteria == "category") {
+        return a.category.toLowerCase().compareTo(b.category.toLowerCase());
+      }
+      if (sortCriteria == "status") {
+        return a.status.toLowerCase().compareTo(b.status.toLowerCase());
+      }
+      return 0; // Default case
     });
+
+    // Update filteredEvents to reflect the sorted list
+    filteredEvents = List.from(events);
   }
 
   // Edit event
@@ -136,33 +140,34 @@ class _EventListPageState extends State<EventListPage> {
     });
   }
 
-  // Modify the _filterEvents method to update filteredEvents properly
   void _filterEvents(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        // If the search bar is empty, show all events
-        filteredEvents = List.from(events);
-      } else {
-        // Otherwise, filter events by name
-        filteredEvents = events.where((event) {
-          return event.name.toLowerCase().contains(query.toLowerCase());
-        }).toList();
-      }
-    });
+    if (query.isEmpty) {
+      // If the search bar is empty, show all events
+      filteredEvents = List.from(events);
+    } else {
+      // Otherwise, filter events by name
+      filteredEvents = events.where((event) {
+        return event.name.toLowerCase().contains(query.toLowerCase());
+      }).toList();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("${widget.friend.name}'s Events"),
+        title: Text("${widget.friend.name} Events"),
         bottom: PreferredSize(
-          preferredSize: Size.fromHeight(56.0), // Height of the search bar
+          preferredSize: Size.fromHeight(56.0),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: TextField(
-              onChanged: (value) =>
-                  _filterEvents(value), // Call filtering function
+              onChanged: (value) {
+                // This will trigger a rebuild with the filtered data
+                setState(() {
+                  query = value;
+                });
+              },
               decoration: InputDecoration(
                 hintText: "Search events...",
                 prefixIcon: Icon(Icons.search),
@@ -195,16 +200,13 @@ class _EventListPageState extends State<EventListPage> {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
+            colors: [Colors.blue, Colors.green], // Define your colors here
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.blue, Colors.purple], // Gradient colors
           ),
         ),
-        child: StreamBuilder<QuerySnapshot>(
-          stream: _firestore
-              .collection('events')
-              .where('userId', isEqualTo: widget.friend.id)
-              .snapshots(),
+        child: StreamBuilder<List<Event>>(
+          stream: _firestoreService.getEventsForUser(widget.friend.id),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Center(child: CircularProgressIndicator());
@@ -215,13 +217,19 @@ class _EventListPageState extends State<EventListPage> {
             }
 
             if (snapshot.hasData) {
-              events = snapshot.data!.docs.map((doc) {
-                return Event.fromFirestore(doc);
-              }).toList();
+              events = snapshot.data!;
 
-              if (filteredEvents.isEmpty) {
-                sortEvents();
-              }
+              // Update filteredEvents here directly after fetching
+              filteredEvents = query.isEmpty
+                  ? List.from(events)
+                  : events.where((event) {
+                      return event.name
+                          .toLowerCase()
+                          .contains(query.toLowerCase());
+                    }).toList();
+
+              sortEvents();
+              _filterEvents(query);
 
               return filteredEvents.isEmpty
                   ? Center(child: Text('No events found.'))
@@ -254,15 +262,18 @@ class _EventListPageState extends State<EventListPage> {
           },
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => CreateEventListPage()),
-          );
-        },
-        child: Icon(Icons.add),
-      ),
+      floatingActionButton: widget.friend.name == 'My'
+          ? FloatingActionButton(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => CreateEventListPage()),
+                );
+              },
+              child: Icon(Icons.add),
+            )
+          : null,
     );
   }
 }
@@ -298,6 +309,11 @@ class EventTile extends StatelessWidget {
     return Card(
       margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: ListTile(
+        leading: CircleAvatar(
+          backgroundImage:
+              AssetImage('assets/default_event_image.png'), // Default image
+          radius: 30,
+        ),
         title: Text(eventName, style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text("Category: $category, Status: $eventStatus",
             style: TextStyle(color: statusColor)),
