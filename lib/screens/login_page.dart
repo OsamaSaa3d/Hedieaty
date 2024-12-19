@@ -25,7 +25,14 @@ class _LoginPageState extends State<LoginPage> {
       );
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => HomePage()),
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => HomePage(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            // Fade transition
+            var opacityTween = Tween(begin: 0.0, end: 1.0).animate(animation);
+            return FadeTransition(opacity: opacityTween, child: child);
+          },
+        ),
       );
     } on FirebaseAuthException catch (e) {
       setState(() {

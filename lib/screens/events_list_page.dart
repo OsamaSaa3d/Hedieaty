@@ -257,9 +257,22 @@ class _EventListPageState extends State<EventListPage> {
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    GiftListPage(event: event),
+                              PageRouteBuilder(
+                                pageBuilder:
+                                    (context, animation, secondaryAnimation) {
+                                  return GiftListPage(event: event);
+                                },
+                                transitionsBuilder: (context, animation,
+                                    secondaryAnimation, child) {
+                                  const begin = Offset(1.0, 0.0);
+                                  const end = Offset.zero;
+                                  const curve = Curves.easeInOut;
+                                  var tween = Tween(begin: begin, end: end)
+                                      .chain(CurveTween(curve: curve));
+                                  var offsetAnimation = animation.drive(tween);
+                                  return SlideTransition(
+                                      position: offsetAnimation, child: child);
+                                },
                               ),
                             );
                           },
@@ -278,8 +291,23 @@ class _EventListPageState extends State<EventListPage> {
               onPressed: () async {
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(
-                      builder: (context) => CreateEventListPage()),
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) =>
+                        CreateEventListPage(),
+                    transitionsBuilder:
+                        (context, animation, secondaryAnimation, child) {
+                      const begin = Offset(1.0, 0.0); // Start from the right
+                      const end = Offset.zero; // End at the center
+                      const curve = Curves.easeInOut; // Smooth animation
+                      var tween = Tween(begin: begin, end: end)
+                          .chain(CurveTween(curve: curve));
+                      var offsetAnimation = animation.drive(tween);
+
+                      // Apply the slide transition to the new page
+                      return SlideTransition(
+                          position: offsetAnimation, child: child);
+                    },
+                  ),
                 );
               },
               child: Icon(Icons.add),

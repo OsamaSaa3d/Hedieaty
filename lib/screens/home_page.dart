@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lab3/screens/in_app_notifications_page.dart';
 import 'dart:convert'; // Import for base64 decoding
 import 'create_event_list_page.dart';
 import 'events_list_page.dart';
@@ -229,10 +230,28 @@ class _HomePageState extends State<HomePage> {
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () async {
-                  await Navigator.push(
+                  await Future.delayed(
+                      Duration(milliseconds: 300)); // Delay for animation
+                  Navigator.push(
                     context,
-                    MaterialPageRoute(
-                        builder: (context) => CreateEventListPage()),
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) =>
+                          CreateEventListPage(),
+                      transitionsBuilder:
+                          (context, animation, secondaryAnimation, child) {
+                        // Define the scale transition
+                        var begin = 0.0;
+                        var end = 1.0;
+                        var curve = Curves.easeInOut;
+                        var tween = Tween(begin: begin, end: end)
+                            .chain(CurveTween(curve: curve));
+                        var scaleAnimation = animation.drive(tween);
+
+                        // Apply the scale transition to the new page
+                        return ScaleTransition(
+                            scale: scaleAnimation, child: child);
+                      },
+                    ),
                   );
                   _fetchFriends();
                 },
@@ -290,9 +309,27 @@ class _HomePageState extends State<HomePage> {
                                 onTap: () {
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
+                                    PageRouteBuilder(
+                                      pageBuilder: (context, animation,
+                                              secondaryAnimation) =>
                                           EventListPage(friend: friend),
+                                      transitionsBuilder: (context, animation,
+                                          secondaryAnimation, child) {
+                                        // Define the scale transition
+                                        var begin = 0.0;
+                                        var end = 1.0;
+                                        var curve = Curves.easeInOut;
+                                        var tween = Tween(
+                                                begin: begin, end: end)
+                                            .chain(CurveTween(curve: curve));
+                                        var scaleAnimation =
+                                            animation.drive(tween);
+
+                                        // Apply the scale transition to the new page
+                                        return ScaleTransition(
+                                            scale: scaleAnimation,
+                                            child: child);
+                                      },
                                     ),
                                   );
                                 },
@@ -309,22 +346,21 @@ class _HomePageState extends State<HomePage> {
         selectedItemColor: Colors.white,
         unselectedItemColor: Colors.grey[300],
         items: [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(icon: Icon(Icons.group), label: "Friends"),
           BottomNavigationBarItem(
               key: Key('bottom_nav_bar_events'),
               icon: Icon(Icons.event),
               label: "Events"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.notifications), label: "Notifications"),
         ],
         onTap: (index) {
           if (index == 0) {
-            print("Navigate to Home");
-          } else if (index == 1) {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => AddFriendsPage()),
             );
-          } else if (index == 2) {
+          } else if (index == 1) {
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -335,6 +371,13 @@ class _HomePageState extends State<HomePage> {
                     upcomingEvents: 0,
                   ),
                 ),
+              ),
+            );
+          } else if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => InAppNotificationsPage(),
               ),
             );
           }

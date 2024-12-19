@@ -30,7 +30,56 @@ class HedieatyApp extends StatelessWidget {
           backgroundColor: Color(0xFF6200EE),
         ),
       ),
-      home: LoginPage(), // The LoginPage you already created
+      home: SplashScreen(), // Show Splash Screen first
+    );
+  }
+}
+
+class SplashScreen extends StatefulWidget {
+  @override
+  _SplashScreenState createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _navigateToLoginPage();
+  }
+
+  // Navigate to LoginPage after a delay
+  void _navigateToLoginPage() {
+    Future.delayed(Duration(seconds: 3), () {
+      // After 3 seconds, navigate to the login page
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => LoginPage()),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Color(0xFF6200EE),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset('assets/logo.jpg',
+                height: 100.0), // Add your logo image here
+            SizedBox(height: 20),
+            Text(
+              'Welcome to Hedieaty!',
+              style: TextStyle(
+                fontSize: 30.0,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

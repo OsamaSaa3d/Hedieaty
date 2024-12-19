@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lab3/screens/events_list_page.dart';
 import 'gift_details_page.dart'; // Ensure this is imported
@@ -176,13 +177,26 @@ class _GiftListPageState extends State<GiftListPage> {
           ? FloatingActionButton(
               key: Key("add_gift_button"),
               onPressed: () async {
-                final newGift = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        GiftDetailsPage(eventId: widget.event.id),
-                  ),
-                );
+                final newGift =
+                    await Navigator.of(context).push(PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) {
+                    return GiftDetailsPage(eventId: widget.event.id);
+                  },
+                  transitionsBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                    // Define the transition effect (slide-up from the bottom)
+                    const begin = Offset(0.0, 1.0); // Start from the bottom
+                    const end = Offset.zero; // End at the top
+                    const curve = Curves.easeInOut;
+
+                    var tween = Tween(begin: begin, end: end)
+                        .chain(CurveTween(curve: curve));
+                    var offsetAnimation = animation.drive(tween);
+
+                    return SlideTransition(
+                        position: offsetAnimation, child: child);
+                  },
+                ));
               },
               child: Icon(Icons.add),
             )
@@ -298,6 +312,33 @@ class _GiftListPageState extends State<GiftListPage> {
     final newPledgerId = isPledged ? currentUserId : null;
 
     try {
+      final eventSnapshot = await FirebaseFirestore.instance
+          .collection('events')
+          .doc(widget.event.id)
+          .get();
+      if (!eventSnapshot.exists) {
+        print("Event not found");
+        return;
+      }
+      final eventData = eventSnapshot.data();
+      final userId = eventData?['userId'];
+
+      if (userId == null) {
+        print("User ID not found in event data.");
+        return;
+      }
+
+      final userSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUserId)
+          .get();
+      if (!userSnapshot.exists) {
+        print("user not found");
+        return;
+      }
+      final userData = userSnapshot.data();
+      final pledgerName = userData?['name'];
+
       // Update Firestore
       await _firestoreService.updateGiftStatus(
         widget.event.id,
@@ -306,6 +347,19 @@ class _GiftListPageState extends State<GiftListPage> {
         newPledgerId,
       );
 
+      // Add the gift status history for the user
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('gifts status history')
+          .add({
+        'giftId': gift['id'],
+        'giftName': gift['name'],
+        'status': newStatus,
+        'pledgerId': newPledgerId,
+        'pledgerName': pledgerName,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
       // Update local state
       setState(() {
         gifts[index]['status'] = newStatus;
