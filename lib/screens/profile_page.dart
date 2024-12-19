@@ -439,6 +439,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         SizedBox(height: 20),
                         ElevatedButton(
+                          key: Key("my_pledged_gifts_button"),
                           onPressed: () {
                             Navigator.push(
                               context,
@@ -452,6 +453,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                         ),
                         ElevatedButton(
+                          key: const Key('my_event_that_got_pledged_button'),
                           onPressed: () {
                             Navigator.push(
                               context,

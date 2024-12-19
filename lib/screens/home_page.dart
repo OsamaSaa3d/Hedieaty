@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -49,6 +50,18 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  void saveTokenToFirestore(String userId) async {
+    print("Saving FCM token to Firestore");
+    String? token = await FirebaseMessaging.instance.getToken();
+    print("Token: $token");
+    if (token != null) {
+      await FirebaseFirestore.instance.collection('users').doc(userId).set({
+        'fcm_token': token,
+      }, SetOptions(merge: true));
+      print("Token saved: $token");
+    }
+  }
+
   Future<int> _fetchUpcomingEvents(String friendId) async {
     try {
       final querySnapshot = await _firestore
@@ -66,6 +79,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _fetchFriends() async {
     final currentUserId = _auth.currentUser?.uid;
+    saveTokenToFirestore(currentUserId!);
     if (currentUserId == null) return;
 
     try {
@@ -178,6 +192,7 @@ class _HomePageState extends State<HomePage> {
         elevation: 0,
         actions: [
           IconButton(
+            key: Key("profile_button"),
             icon: Icon(Icons.account_circle, color: Colors.white),
             onPressed: () {
               Navigator.push(
@@ -187,6 +202,7 @@ class _HomePageState extends State<HomePage> {
             },
           ),
           IconButton(
+            key: Key("logout_button"),
             icon: Icon(Icons.logout, color: Colors.white),
             onPressed: _logout,
           ),
@@ -253,6 +269,7 @@ class _HomePageState extends State<HomePage> {
                                   vertical: 5, horizontal: 16),
                               color: Colors.white,
                               child: ListTile(
+                                key: Key("friend_tile"),
                                 leading: CircleAvatar(
                                   backgroundImage:
                                       friend.profilePicUrl != null &&
@@ -294,7 +311,10 @@ class _HomePageState extends State<HomePage> {
         items: [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(icon: Icon(Icons.group), label: "Friends"),
-          BottomNavigationBarItem(icon: Icon(Icons.event), label: "Events"),
+          BottomNavigationBarItem(
+              key: Key('bottom_nav_bar_events'),
+              icon: Icon(Icons.event),
+              label: "Events"),
         ],
         onTap: (index) {
           if (index == 0) {

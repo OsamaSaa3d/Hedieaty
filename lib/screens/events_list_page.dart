@@ -183,6 +183,7 @@ class _EventListPageState extends State<EventListPage> {
         ),
         actions: [
           PopupMenuButton<String>(
+            key: const Key('popup_menu'),
             onSelected: (value) {
               setState(() {
                 sortCriteria = value;
@@ -190,9 +191,18 @@ class _EventListPageState extends State<EventListPage> {
               });
             },
             itemBuilder: (context) => [
-              PopupMenuItem(value: "name", child: Text("Sort by Name")),
-              PopupMenuItem(value: "category", child: Text("Sort by Category")),
-              PopupMenuItem(value: "status", child: Text("Sort by Status")),
+              PopupMenuItem(
+                  key: const Key('sort_name'),
+                  value: "name",
+                  child: Text("Sort by Name")),
+              PopupMenuItem(
+                  key: const Key('sort_category'),
+                  value: "category",
+                  child: Text("Sort by Category")),
+              PopupMenuItem(
+                  key: const Key('sort_status'),
+                  value: "status",
+                  child: Text("Sort by Status")),
             ],
           ),
         ],
@@ -264,6 +274,7 @@ class _EventListPageState extends State<EventListPage> {
       ),
       floatingActionButton: widget.friend.name == 'My'
           ? FloatingActionButton(
+              key: const Key('add_event_button'),
               onPressed: () async {
                 await Navigator.push(
                   context,
@@ -309,6 +320,7 @@ class EventTile extends StatelessWidget {
     return Card(
       margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: ListTile(
+        key: Key("event_tile"),
         leading: CircleAvatar(
           backgroundImage:
               AssetImage('assets/default_event_image.png'), // Default image
@@ -324,10 +336,12 @@ class EventTile extends StatelessWidget {
             if (userId == currentUserId) ...[
               // Check userId safely
               IconButton(
+                key: const Key("edit_event_button"),
                 icon: Icon(Icons.edit, color: Theme.of(context).primaryColor),
                 onPressed: onEdit,
               ),
               IconButton(
+                key: const Key("delete_event_button"),
                 icon: Icon(Icons.delete, color: Colors.red),
                 onPressed: onDelete,
               ),

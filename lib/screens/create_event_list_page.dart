@@ -97,6 +97,7 @@ class _CreateEventListPageState extends State<CreateEventListPage> {
 
   // Helper method for building text fields (unchanged)
   Widget _buildTextField({
+    required Key key,
     required String label,
     String? initialValue,
     Function(String?)? onSaved,
@@ -106,6 +107,7 @@ class _CreateEventListPageState extends State<CreateEventListPage> {
     Function()? onTap,
   }) {
     return TextFormField(
+      key: key,
       decoration: InputDecoration(labelText: label),
       initialValue: initialValue,
       onSaved: onSaved,
@@ -189,6 +191,7 @@ class _CreateEventListPageState extends State<CreateEventListPage> {
             child: Column(
               children: [
                 _buildTextField(
+                  key: const Key('event_name_field'),
                   label: "Event/List Name",
                   initialValue: eventName,
                   onSaved: (value) => eventName = value,
@@ -201,6 +204,7 @@ class _CreateEventListPageState extends State<CreateEventListPage> {
                 ),
                 SizedBox(height: 16),
                 _buildTextField(
+                  key: const Key('event_description_field'),
                   label: "Event Description",
                   initialValue: eventDescription,
                   onSaved: (value) => eventDescription = value,
@@ -213,6 +217,7 @@ class _CreateEventListPageState extends State<CreateEventListPage> {
                 ),
                 SizedBox(height: 16),
                 _buildTextField(
+                  key: const Key('event_location_field'),
                   label: "Event Location",
                   initialValue: eventLocation,
                   onSaved: (value) => eventLocation = value,
@@ -225,6 +230,7 @@ class _CreateEventListPageState extends State<CreateEventListPage> {
                 ),
                 SizedBox(height: 16),
                 _buildTextField(
+                  key: const Key('event_date_field'),
                   label: "Event Date (YYYY-MM-DD)",
                   readOnly: true,
                   onTap: () async {
@@ -257,6 +263,7 @@ class _CreateEventListPageState extends State<CreateEventListPage> {
                 _buildStatusDropdown(),
                 SizedBox(height: 16),
                 ElevatedButton(
+                  key: const Key('create_event_button'),
                   onPressed: _saveEvent,
                   child: Text("Save Event/List"),
                 ),

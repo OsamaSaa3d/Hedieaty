@@ -79,6 +79,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     SizedBox(height: 20),
                     TextField(
+                      key: const Key('email_field'),
                       controller: _emailController,
                       decoration: InputDecoration(
                         prefixIcon: Icon(Icons.email, color: Colors.blue),
@@ -93,6 +94,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     SizedBox(height: 16),
                     TextField(
+                      key: const Key('password_field'),
                       controller: _passwordController,
                       obscureText: !_isPasswordVisible,
                       decoration: InputDecoration(
@@ -130,6 +132,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     SizedBox(height: 20),
                     ElevatedButton(
+                      key: const Key('login_button'),
                       onPressed: _login,
                       style: ElevatedButton.styleFrom(
                         padding: EdgeInsets.symmetric(vertical: 12),

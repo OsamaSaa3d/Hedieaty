@@ -146,6 +146,7 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
             child: Column(
               children: [
                 _buildTextField(
+                  key: const Key('gift_name_field'),
                   label: 'Gift Name',
                   initialValue: giftName,
                   onSaved: (value) => giftName = value ?? '',
@@ -155,16 +156,19 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
                   },
                 ),
                 _buildTextField(
+                  key: const Key('gift_description_field'),
                   label: 'Description',
                   initialValue: description,
                   onSaved: (value) => description = value ?? '',
                 ),
                 _buildTextField(
+                  key: const Key('gift_category_field'),
                   label: 'Category',
                   initialValue: category,
                   onSaved: (value) => category = value ?? '',
                 ),
                 _buildTextField(
+                  key: const Key('gift_price_field'),
                   label: 'Price',
                   initialValue: price.toString(),
                   keyboardType: TextInputType.number,
@@ -205,6 +209,7 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
                   ),
                 ),
                 ElevatedButton(
+                  key: const Key('gift_create_button'),
                   onPressed: _saveGift,
                   child: Text(
                       widget.giftDetails == null ? "Add Gift" : "Update Gift"),
@@ -219,6 +224,7 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
 
   // Helper method for creating text fields
   Widget _buildTextField({
+    required Key key,
     required String label,
     required String initialValue,
     required Function(String?) onSaved,
@@ -226,6 +232,7 @@ class _GiftDetailsPageState extends State<GiftDetailsPage> {
     TextInputType keyboardType = TextInputType.text,
   }) {
     return TextFormField(
+      key: key,
       initialValue: initialValue,
       decoration: InputDecoration(labelText: label),
       onSaved: onSaved,

@@ -88,6 +88,7 @@ class _GiftListPageState extends State<GiftListPage> {
         ),
         actions: [
           PopupMenuButton<String>(
+            key: Key("gifts_popup_menu"),
             onSelected: (value) {
               setState(() {
                 sortCriteria = value;
@@ -95,9 +96,18 @@ class _GiftListPageState extends State<GiftListPage> {
               });
             },
             itemBuilder: (context) => [
-              PopupMenuItem(value: "name", child: Text("Sort by Name")),
-              PopupMenuItem(value: "category", child: Text("Sort by Category")),
-              PopupMenuItem(value: "status", child: Text("Sort by Status")),
+              PopupMenuItem(
+                  key: Key("sort_gifts_name"),
+                  value: "name",
+                  child: Text("Sort by Name")),
+              PopupMenuItem(
+                  key: Key("sort_gifts_category"),
+                  value: "category",
+                  child: Text("Sort by Category")),
+              PopupMenuItem(
+                  key: Key("sort_gifts_status"),
+                  value: "status",
+                  child: Text("Sort by Status")),
             ],
           ),
         ],
@@ -164,6 +174,7 @@ class _GiftListPageState extends State<GiftListPage> {
       ),
       floatingActionButton: isUserCreator
           ? FloatingActionButton(
+              key: Key("add_gift_button"),
               onPressed: () async {
                 final newGift = await Navigator.push(
                   context,
@@ -449,6 +460,7 @@ class GiftTile extends StatelessWidget {
                   SizedBox(height: 16),
                   // Close button
                   TextButton(
+                    key: Key("close_button"),
                     onPressed: () {
                       Navigator.of(context).pop();
                     },
@@ -468,6 +480,7 @@ class GiftTile extends StatelessWidget {
     return Card(
       margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: ListTile(
+        key: Key("gift_tile"),
         leading: giftImage,
         title: Text(giftName, style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text("Category: $category, Status: $status",
@@ -480,16 +493,19 @@ class GiftTile extends StatelessWidget {
           children: [
             if (onEdit != null)
               IconButton(
+                key: Key("edit_gift_button"),
                 icon: Icon(Icons.edit, color: Theme.of(context).primaryColor),
                 onPressed: onEdit,
               ),
             if (onDelete != null)
               IconButton(
+                key: Key("delete_gift_button"),
                 icon: Icon(Icons.delete, color: Colors.red),
                 onPressed: onDelete,
               ),
             if (onPledgeChange != null)
               Switch(
+                key: Key("gift_pledge_switch"),
                 value: status == "Pledged",
                 onChanged: (bool value) {
                   if (onPledgeChange != null) {
